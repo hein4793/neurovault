@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --brain-bg: #0A0A0F;
+  --brain-panel: #0F172A;
+  --brain-border: #1E293B;
+  --brain-accent: #38BDF8;
+  --brain-text: #E2E8F0;
+  --brain-muted: #64748B;
+}
+
+body {
+  background-color: var(--brain-bg);
+  color: var(--brain-text);
+  font-family: 'Inter', system-ui, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+#root {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Glassmorphism panel */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(30, 41, 59, 0.5);
+  border-radius: 12px;
+}
+
+/* Glow effects */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+/* Pulse animation for active elements */
+@keyframes neural-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+.neural-pulse {
+  animation: neural-pulse 3s ease-in-out infinite;
+}

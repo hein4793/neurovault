@@ -1,0 +1,94 @@
+[package]
+name = "neurovault"
+version = "0.1.0"
+description = "NeuroVault - Self-Evolving 3D Knowledge Brain"
+authors = ["NeuroVault Contributors"]
+edition = "2021"
+# Phase 3.3 — There are now two binaries (neurovault desktop + brain-headless service).
+# Tauri's `cargo run` needs to know which one is the default.
+default-run = "neurovault"
+
+[lib]
+name = "claude_brain_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Phase 3.3 — Optional headless binary that runs the brain without the
+# Tauri desktop GUI. Build with:
+#   cargo build --features windows-service-mode --bin brain-headless
+[[bin]]
+name = "brain-headless"
+path = "src/bin/brain_headless.rs"
+required-features = ["windows-service-mode"]
+
+[features]
+default = []
+# Phase 4.6 — Optional LanceDB backend for billion-scale vector search.
+# Off by default because the lancedb crate pulls in Apache Arrow + native
+# deps that significantly slow first-time builds. Enable when the brain
+# crosses ~10M nodes:
+#   cargo build --features lancedb-backend
+lancedb-backend = ["dep:lancedb", "dep:futures", "dep:arrow-array", "dep:arrow-schema"]
+# Phase 2.5 follow-up — Optional Parquet cold-storage format. Off by
+# default because the Arrow dependency tree is large. Enable with:
+#   cargo build --features parquet-storage
+parquet-storage = ["dep:parquet", "dep:arrow-array", "dep:arrow-schema"]
+# Phase 3.3 — True Windows service binary. Off by default because it
+# only makes sense on Windows. Enable with:
+#   cargo build --features windows-service --bin brain-headless
+windows-service-mode = ["dep:windows-service"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+# SQLite — replaces SurrealDB. WAL mode for crash safety, FTS5 for
+# instant full-text search. Bundled = ships SQLite as a static lib.
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+dirs = "6"
+log = "0.4"
+env_logger = "0.11"
+thiserror = "2"
+notify = "7"
+pulldown-cmark = "0.12"
+html2md = "0.2"
+tauri-plugin-dialog = "2.7.0"
+# PDF + DOCX text extraction for file ingestion
+pdf-extract = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+# === Phase 1: Sidekick + Scaling ===
+# HNSW index for semantic search at scale (pure Rust, no C deps)
+instant-distance = "0.6"
+# HTTP API server (the bridge to the standalone MCP server)
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+# Project directory traversal for code ingestion
+walkdir = "2.5"
+# bincode for HNSW serialisation
+bincode = "1.3"
+# async-trait for the VectorBackend trait (Phase 3.4)
+async-trait = "0.1"
+# Parquet for compressed cold storage (Phase 2.5) — feature-gated to keep
+# the default build lean. Apache Arrow is ~60 crates and noticeably slows
+# first-time builds. Enable with: cargo build --features parquet-storage
+parquet = { version = "53", default-features = false, features = ["arrow", "snap"], optional = true }
+arrow-array = { version = "53", optional = true }
+arrow-schema = { version = "53", optional = true }
+# Phase 3.3 — Optional Windows service support for the headless binary.
+# Off by default. Enable with --features windows-service-mode.
+windows-service = { version = "0.7", optional = true }
+# Phase 4.6 — Optional LanceDB vector backend (off by default)
+lancedb = { version = "0.10", optional = true }
+futures = { version = "0.3", optional = true }
