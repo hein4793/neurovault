@@ -132,18 +132,18 @@ pub fn run() {
                             )
                             .await;
                         });
-                        // Auto-export brain knowledge for AI assistant access
+                        // Auto-export brain knowledge for Claude Code access
                         let export_db = db.clone();
                         tauri::async_runtime::spawn(async move {
                             let export_dir = export_db.config.export_dir();
                             let json_path = export_dir.join("brain-knowledge.json");
                             let nodes_dir = export_dir.join("nodes");
                             match export::export_json(&export_db, &json_path.to_string_lossy()).await {
-                                Ok(count) => log::info!("Auto-exported {} nodes to JSON for AI assistant", count),
+                                Ok(count) => log::info!("Auto-exported {} nodes to JSON for Claude Code", count),
                                 Err(e) => log::warn!("Auto-export JSON failed: {}", e),
                             }
                             match export::export_markdown(&export_db, &nodes_dir.to_string_lossy()).await {
-                                Ok(count) => log::info!("Auto-exported {} nodes to markdown for AI assistant", count),
+                                Ok(count) => log::info!("Auto-exported {} nodes to markdown for Claude Code", count),
                                 Err(e) => log::warn!("Auto-export markdown failed: {}", e),
                             }
                         });
@@ -175,7 +175,7 @@ pub fn run() {
                         });
 
                         // Phase 1.2 — Proactive context injector. Watches the
-                        // most recently active AI assistant session and writes
+                        // most recently active Claude Code session and writes
                         // ~/.neurovault/export/active-context.md.
                         // Phase 1.2B upgrade: now event-driven via its own
                         // file watcher with a 30s polling fallback.
@@ -278,7 +278,7 @@ pub fn run() {
             // Ingestion
             commands::ingest::ingest_url,
             commands::ingest::ingest_text,
-            commands::ingest::import_ai_memory,
+            commands::ingest::import_claude_memory,
             commands::ingest::import_chat_history,
             commands::ingest::research_topic,
             commands::ingest::research_batch,
@@ -299,12 +299,6 @@ pub fn run() {
             commands::settings::update_settings,
             commands::settings::clear_cache,
             commands::settings::get_brain_version,
-            // Onboarding
-            commands::settings::get_setup_status,
-            commands::settings::complete_setup,
-            commands::settings::check_ollama_status,
-            commands::settings::pull_ollama_model,
-            commands::settings::detect_ai_assistant_dirs,
             // Quality
             commands::quality::calculate_quality,
             commands::quality::calculate_decay,
@@ -353,7 +347,7 @@ pub fn run() {
             commands::activity::get_brain_activity,
             // Phase 1.2C — sidekick suggestions
             commands::activity::get_active_suggestions,
-            // MCP — Phase 0 brain bridge for AI assistant
+            // MCP — Phase 0 brain bridge for Claude Code
             commands::mcp::get_mcp_status,
             commands::mcp::brain_recall,
             commands::mcp::brain_context,

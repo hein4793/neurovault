@@ -4,7 +4,6 @@ use crate::events::{emit_event, BrainEvent};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrainSettings {
@@ -40,21 +39,9 @@ pub struct BrainSettings {
     pub autonomy_export_mins: u64,
     #[serde(default = "default_max_daily_research")]
     pub autonomy_max_daily_research: u32,
-    // Onboarding fields
-    #[serde(default)]
-    pub setup_completed: bool,
-    #[serde(default = "default_brain_name")]
-    pub brain_name: String,
-    #[serde(default = "default_true")]
-    pub enable_ai_assistant_sync: bool,
-    #[serde(default)]
-    pub enable_file_watcher: bool,
-    #[serde(default)]
-    pub watched_paths: Vec<String>,
 }
 
 fn default_true() -> bool { true }
-fn default_brain_name() -> String { "My Brain".to_string() }
 fn default_linking_mins() -> u64 { 60 }
 fn default_quality_mins() -> u64 { 240 }
 fn default_learning_mins() -> u64 { 360 }
@@ -80,11 +67,6 @@ impl Default for BrainSettings {
             autonomy_learning_mins: 360,
             autonomy_export_mins: 30,
             autonomy_max_daily_research: 10,
-            setup_completed: false,
-            brain_name: "My Brain".to_string(),
-            enable_ai_assistant_sync: true,
-            enable_file_watcher: false,
-            watched_paths: Vec::new(),
         }
     }
 }
@@ -130,50 +112,12 @@ pub async fn get_settings(db: State<'_, Arc<BrainDb>>) -> Result<BrainSettings, 
     }
 }
 
-/// Validate settings values to prevent dangerous configurations.
-fn validate_settings(settings: &BrainSettings) -> Result<(), BrainError> {
-    // ollama_url must point to localhost only
-    if !settings.ollama_url.starts_with("http://localhost")
-        && !settings.ollama_url.starts_with("http://127.0.0.1")
-    {
-        return Err(BrainError::Database(
-            "ollama_url must start with http://localhost or http://127.0.0.1".to_string(),
-        ));
-    }
-
-    // embedding_model must be alphanumeric + hyphens + colons + dots + underscores + slashes only
-    if !settings.embedding_model.chars().all(|c| c.is_alphanumeric() || c == '-' || c == ':' || c == '.' || c == '_' || c == '/') {
-        return Err(BrainError::Database(
-            "embedding_model contains invalid characters (only alphanumeric, hyphens, colons, dots, underscores, slashes allowed)".to_string(),
-        ));
-    }
-
-    // Autonomy intervals must be > 0
-    if settings.autonomy_linking_mins == 0 {
-        return Err(BrainError::Database("autonomy_linking_mins must be > 0".to_string()));
-    }
-    if settings.autonomy_quality_mins == 0 {
-        return Err(BrainError::Database("autonomy_quality_mins must be > 0".to_string()));
-    }
-    if settings.autonomy_learning_mins == 0 {
-        return Err(BrainError::Database("autonomy_learning_mins must be > 0".to_string()));
-    }
-    if settings.autonomy_export_mins == 0 {
-        return Err(BrainError::Database("autonomy_export_mins must be > 0".to_string()));
-    }
-
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn update_settings(
     app: tauri::AppHandle,
     db: State<'_, Arc<BrainDb>>,
     settings: BrainSettings,
 ) -> Result<BrainSettings, BrainError> {
-    // Validate settings before persisting
-    validate_settings(&settings)?;
-
     let path = settings_path(&db);
     let data = serde_json::to_string_pretty(&settings)
         .map_err(|e| BrainError::Serialization(e))?;
@@ -200,192 +144,4 @@ pub async fn clear_cache(db: State<'_, Arc<BrainDb>>) -> Result<String, BrainErr
 #[tauri::command]
 pub async fn get_brain_version() -> Result<String, BrainError> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
-}
-
-// ===== Onboarding wizard commands =====
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetupStatus {
-    pub setup_completed: bool,
-}
-
-/// Returns whether the first-run onboarding wizard has been completed.
-/// Reads from settings.json; defaults to false if the file doesn't exist.
-#[tauri::command]
-pub async fn get_setup_status(db: State<'_, Arc<BrainDb>>) -> Result<SetupStatus, BrainError> {
-    let settings = load_settings(&db);
-    Ok(SetupStatus {
-        setup_completed: settings.setup_completed,
-    })
-}
-
-/// Marks onboarding as complete and persists optional configuration
-/// chosen during the wizard (brain name, watched paths, toggles).
-#[tauri::command]
-pub async fn complete_setup(
-    app: tauri::AppHandle,
-    db: State<'_, Arc<BrainDb>>,
-    brain_name: String,
-    enable_ai_assistant_sync: bool,
-    enable_file_watcher: bool,
-    watched_paths: Vec<String>,
-) -> Result<SetupStatus, BrainError> {
-    let mut settings = load_settings(&db);
-    settings.setup_completed = true;
-    settings.brain_name = brain_name;
-    settings.enable_ai_assistant_sync = enable_ai_assistant_sync;
-    settings.enable_file_watcher = enable_file_watcher;
-    settings.watched_paths = watched_paths;
-
-    let path = settings_path(&db);
-    let data = serde_json::to_string_pretty(&settings)
-        .map_err(BrainError::Serialization)?;
-    std::fs::write(&path, data).map_err(BrainError::Io)?;
-
-    emit_event(&app, BrainEvent::SettingsUpdated {
-        key: "setup_completed".to_string(),
-    });
-
-    Ok(SetupStatus { setup_completed: true })
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OllamaStatus {
-    pub reachable: bool,
-    pub models: Vec<OllamaModelInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OllamaModelInfo {
-    pub name: String,
-    pub size: u64,
-}
-
-/// Checks if Ollama is running and lists available models.
-#[tauri::command]
-pub async fn check_ollama_status(
-    db: State<'_, Arc<BrainDb>>,
-) -> Result<OllamaStatus, BrainError> {
-    let url = format!("{}/api/tags", db.config.ollama_url);
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new());
-
-    #[derive(Debug, Deserialize)]
-    struct TagsResp {
-        models: Vec<TagModel>,
-    }
-    #[derive(Debug, Deserialize)]
-    struct TagModel {
-        name: String,
-        #[serde(default)]
-        size: u64,
-    }
-
-    match client.get(&url).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            let tags: TagsResp = resp.json().await.unwrap_or(TagsResp { models: Vec::new() });
-            let models = tags
-                .models
-                .into_iter()
-                .map(|t| OllamaModelInfo {
-                    name: t.name,
-                    size: t.size,
-                })
-                .collect();
-            Ok(OllamaStatus {
-                reachable: true,
-                models,
-            })
-        }
-        _ => Ok(OllamaStatus {
-            reachable: false,
-            models: Vec::new(),
-        }),
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PullProgress {
-    pub status: String,
-    pub completed: bool,
-    pub error: Option<String>,
-}
-
-/// Pulls an Ollama model by name. This is a blocking call that streams
-/// the pull progress and returns a final status.
-#[tauri::command]
-pub async fn pull_ollama_model(
-    db: State<'_, Arc<BrainDb>>,
-    model_name: String,
-) -> Result<PullProgress, BrainError> {
-    let url = format!("{}/api/pull", db.config.ollama_url);
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(600))
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new());
-
-    let body = serde_json::json!({
-        "name": model_name,
-        "stream": false
-    });
-
-    match client.post(&url).json(&body).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            // Non-streaming: Ollama returns a final JSON with status
-            let text = resp.text().await.unwrap_or_default();
-            // The response may contain multiple JSON lines; take the last
-            let last_line = text.lines().last().unwrap_or("");
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(last_line) {
-                let status = val["status"].as_str().unwrap_or("unknown").to_string();
-                let error = val["error"].as_str().map(|s| s.to_string());
-                Ok(PullProgress {
-                    status,
-                    completed: error.is_none(),
-                    error,
-                })
-            } else {
-                Ok(PullProgress {
-                    status: "completed".to_string(),
-                    completed: true,
-                    error: None,
-                })
-            }
-        }
-        Ok(resp) => {
-            let err_text = resp.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            Ok(PullProgress {
-                status: "failed".to_string(),
-                completed: false,
-                error: Some(err_text),
-            })
-        }
-        Err(e) => Ok(PullProgress {
-            status: "failed".to_string(),
-            completed: false,
-            error: Some(format!("Connection failed: {}", e)),
-        }),
-    }
-}
-
-/// Detect default AI assistant chat directories (if they exist).
-#[tauri::command]
-pub async fn detect_ai_assistant_dirs() -> Result<Vec<String>, BrainError> {
-    let mut dirs_found = Vec::new();
-    if let Some(home) = dirs::home_dir() {
-        // Check for AI assistant project directories
-        for dir_name in &[".claude", ".cursor", ".continue"] {
-            let ai_dir = home.join(dir_name).join("projects");
-            if ai_dir.exists() {
-                dirs_found.push(ai_dir.to_string_lossy().to_string());
-            }
-        }
-        // Check for Copilot chat directory
-        let copilot_dir = home.join(".config").join("github-copilot");
-        if copilot_dir.exists() {
-            dirs_found.push(copilot_dir.to_string_lossy().to_string());
-        }
-    }
-    Ok(dirs_found)
 }

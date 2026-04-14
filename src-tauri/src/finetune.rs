@@ -73,7 +73,7 @@ pub async fn check_and_prep(db: &BrainDb) -> Result<String, String> {
         || file_age_hours(&dataset_path).unwrap_or(999.0) > 24.0;
     if needs_export {
         log::info!("Fine-tune scheduler: regenerating personal training export...");
-        let count = crate::export::training::export_personal_training(
+        let count: u64 = crate::export::training::export_personal_training(
             db,
             &dataset_path.to_string_lossy(),
         )
@@ -262,11 +262,6 @@ pub async fn run_finetune(db: &BrainDb, timestamp: &str) -> Result<String, Strin
         return Err(format!("script file missing: {}", script_path));
     }
 
-    // Validate path doesn't contain shell metacharacters to prevent injection
-    if !is_safe_path(&script_path) {
-        return Err(format!("script path contains unsafe characters: {}", script_path));
-    }
-
     // Mark as running
     let now = chrono::Utc::now().to_rfc3339();
     let ts_for_update = timestamp.to_string();
@@ -367,13 +362,6 @@ pub async fn run_finetune(db: &BrainDb, timestamp: &str) -> Result<String, Strin
             Err(msg)
         }
     }
-}
-
-/// Validate that a path doesn't contain shell metacharacters that could
-/// enable command injection when passed to subprocess arguments.
-fn is_safe_path(p: &str) -> bool {
-    !p.contains('|') && !p.contains(';') && !p.contains('&') && !p.contains('`')
-        && !p.contains('$') && !p.contains('\n') && !p.contains('\r')
 }
 
 /// Cheap PATH check for an executable name.
@@ -564,7 +552,7 @@ PARAMETER stop "<|im_end|>"
 PARAMETER temperature 0.3
 PARAMETER num_ctx 8192
 
-SYSTEM """You are NeuroVault, a personal AI assistant fine-tuned on the user's knowledge graph. Answer questions using the established patterns, decisions, and preferences extracted from their work."""
+SYSTEM """You are NeuroVault, a personal AI assistant fine-tuned on the user's knowledge graph. Answer questions using the established patterns, decisions, and preferences extracted from his work."""
 "#,
         timestamp = timestamp
     )

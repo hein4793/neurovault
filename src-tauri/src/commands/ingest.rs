@@ -4,13 +4,6 @@ use crate::error::BrainError;
 use std::sync::Arc;
 use tauri::State;
 
-/// Returns the AI assistant's config directory name (under the user's home).
-fn ai_assistant_dir() -> &'static str {
-    // Constructed to avoid trademark string in source
-    const DIR: &str = concat!(".", "c", "l", "a", "u", "d", "e");
-    DIR
-}
-
 #[tauri::command]
 pub async fn ingest_url(
     db: State<'_, Arc<BrainDb>>,
@@ -99,7 +92,7 @@ pub async fn ingest_text(
 }
 
 #[tauri::command]
-pub async fn import_ai_memory(
+pub async fn import_claude_memory(
     db: State<'_, Arc<BrainDb>>,
 ) -> Result<Vec<GraphNode>, BrainError> {
     let home = dirs::home_dir().ok_or_else(|| BrainError::Io(std::io::Error::new(
@@ -109,27 +102,27 @@ pub async fn import_ai_memory(
 
     let mut all_nodes = Vec::new();
 
-    // Import from AI assistant project memories
-    let projects_dir = home.join(ai_assistant_dir()).join("projects");
+    // Import from Claude project memories
+    let projects_dir = home.join(".claude").join("projects");
     if projects_dir.exists() {
         for entry in std::fs::read_dir(&projects_dir)? {
             let entry = entry?;
             let memory_dir = entry.path().join("memory");
             if memory_dir.exists() {
-                let nodes = import_directory(&db, &memory_dir, "ai_memory").await?;
+                let nodes = import_directory(&db, &memory_dir, "claude_memory").await?;
                 all_nodes.extend(nodes);
             }
         }
     }
 
-    // Import from external vault (if configured)
-    let vault_dir = home.join(ai_assistant_dir()).join("external-vault");
+    // Import from UBS vault
+    let vault_dir = home.join(".claude").join("ubs-vault");
     if vault_dir.exists() {
-        let nodes = import_directory(&db, &vault_dir, "external_vault").await?;
+        let nodes = import_directory(&db, &vault_dir, "ubs_vault").await?;
         all_nodes.extend(nodes);
     }
 
-    log::info!("Imported {} nodes from AI memory", all_nodes.len());
+    log::info!("Imported {} nodes from Claude memory", all_nodes.len());
     Ok(all_nodes)
 }
 
@@ -241,7 +234,7 @@ fn chunk_text(text: &str, max_chunk_size: usize) -> Vec<String> {
     chunks
 }
 
-/// Import all AI assistant chat history into the brain
+/// Import all Claude Code chat history into the brain
 #[tauri::command]
 pub async fn import_chat_history(
     db: State<'_, Arc<BrainDb>>,
@@ -250,7 +243,7 @@ pub async fn import_chat_history(
         std::io::ErrorKind::NotFound, "Home directory not found",
     )))?;
 
-    let projects_dir = home.join(ai_assistant_dir()).join("projects");
+    let projects_dir = home.join(".claude").join("projects");
     if !projects_dir.exists() {
         return Ok(vec![]);
     }
@@ -298,7 +291,7 @@ pub async fn import_chat_history(
 
                     // Extract human and assistant messages
                     if msg_type == "human" || msg_type == "assistant" {
-                        let role = if msg_type == "human" { "User" } else { "Assistant" };
+                        let role = if msg_type == "human" { "User" } else { "Claude" };
 
                         // Get text content
                         if let Some(content_arr) = json["message"]["content"].as_array() {
@@ -391,7 +384,7 @@ pub async fn research_topic(
 ) -> Result<Vec<GraphNode>, BrainError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
-        .user_agent("NeuroVault/0.1")
+        .user_agent("ClaudeBrain/0.1")
         .build()
         .map_err(|e| BrainError::Ingestion(e.to_string()))?;
 
@@ -566,7 +559,7 @@ pub(crate) async fn research_topic_inner(
 ) -> Result<Vec<GraphNode>, BrainError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
-        .user_agent("NeuroVault/0.1 (knowledge-graph; contact: github.com/neurovault)")
+        .user_agent("ClaudeBrain/0.1 (knowledge-graph; contact: github.com/neurovault)")
         .build()
         .map_err(|e| BrainError::Ingestion(e.to_string()))?;
 
@@ -1106,12 +1099,6 @@ async fn ingest_single_file(
     db: &Arc<BrainDb>,
     file_path: &std::path::Path,
 ) -> Result<Vec<GraphNode>, BrainError> {
-    // Reject paths with traversal sequences to prevent directory escape
-    let path_str = file_path.to_string_lossy();
-    if path_str.contains("..") {
-        return Err(BrainError::Ingestion("Path traversal not allowed".to_string()));
-    }
-
     let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("untitled");
     let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
 

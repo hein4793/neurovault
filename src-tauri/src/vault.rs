@@ -2,7 +2,7 @@
 //! Obsidian-style vault — plain markdown files for every knowledge node.
 //!
 //! Each node is written to `~/.neurovault/vault/{domain}/{slug}.md` with
-//! YAML frontmatter. Your AI assistant can read these natively without any API call.
+//! YAML frontmatter. Claude Code can read these natively without any API call.
 
 use crate::config::BrainConfig;
 use crate::db::models::GraphNode;

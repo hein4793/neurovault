@@ -6,9 +6,7 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::{g
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
-use tower_http::cors::{Any, AllowOrigin, CorsLayer};
+use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Clone)]
 pub struct AppState { pub db: Arc<BrainDb> }
@@ -17,15 +15,7 @@ pub async fn run_http_server(db: Arc<BrainDb>) {
     let port = db.config.http_api_port();
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     let state = AppState { db };
-    let cors = CorsLayer::new()
-        .allow_origin(AllowOrigin::predicate(|origin, _| {
-            origin.as_bytes().starts_with(b"http://localhost")
-                || origin.as_bytes().starts_with(b"http://127.0.0.1")
-                || origin.as_bytes().starts_with(b"https://localhost")
-                || origin.as_bytes().starts_with(b"tauri://localhost")
-        }))
-        .allow_methods(Any)
-        .allow_headers(Any);
+    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
     let app = Router::new()
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
@@ -101,45 +91,6 @@ pub async fn run_http_server(db: Arc<BrainDb>) {
 struct ApiError { error: String }
 fn err(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<ApiError>) { (status, Json(ApiError { error: msg.into() })) }
 
-// =========================================================================
-// Rate limiting — simple in-memory counter (300 requests/minute on writes)
-// =========================================================================
-
-static REQUEST_COUNT: AtomicU64 = AtomicU64::new(0);
-static LAST_RESET: std::sync::OnceLock<std::sync::Mutex<Instant>> = std::sync::OnceLock::new();
-
-/// Returns `true` if the request is within the rate limit, `false` if exceeded.
-fn check_rate_limit() -> bool {
-    let mutex = LAST_RESET.get_or_init(|| std::sync::Mutex::new(Instant::now()));
-    let mut last = mutex.lock().unwrap();
-    if last.elapsed().as_secs() > 60 {
-        REQUEST_COUNT.store(0, Ordering::Relaxed);
-        *last = Instant::now();
-    }
-    let count = REQUEST_COUNT.fetch_add(1, Ordering::Relaxed);
-    count < 300 // max 300 requests per minute
-}
-
-/// Returns a 429 Too Many Requests response if rate limit is exceeded.
-fn rate_limit_response() -> Option<(StatusCode, Json<ApiError>)> {
-    if !check_rate_limit() {
-        Some(err(StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded - max 300 requests per minute"))
-    } else {
-        None
-    }
-}
-
-// =========================================================================
-// Input validation helpers
-// =========================================================================
-
-fn validate_input(s: &str, max_len: usize, field: &str) -> Result<(), (StatusCode, Json<ApiError>)> {
-    if s.len() > max_len {
-        return Err(err(StatusCode::BAD_REQUEST, format!("{} exceeds max length of {}", field, max_len)));
-    }
-    Ok(())
-}
-
 async fn handle_health() -> impl IntoResponse {
     Json(serde_json::json!({ "status": "ok", "service": "neurovault", "version": env!("CARGO_PKG_VERSION") }))
 }
@@ -152,8 +103,6 @@ async fn handle_stats(State(state): State<AppState>) -> impl IntoResponse {
 #[derive(Serialize)] struct RecallResp { query: String, matches: Vec<SearchResult>, source_count: usize }
 
 async fn handle_recall(State(state): State<AppState>, Json(req): Json<RecallReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.query, 10_000, "query") { return resp.into_response(); }
     let limit = req.limit.unwrap_or(10);
     let _ = log_call(&state.db, "brain_recall", &req.query).await;
     let client = crate::embeddings::OllamaClient::new(state.db.config.ollama_url.clone(), state.db.config.embedding_model.clone());
@@ -211,8 +160,6 @@ async fn handle_preferences(State(state): State<AppState>, Json(req): Json<Prefe
 #[derive(Serialize)] struct DecisionsResp { topic: String, decisions: Vec<SearchResult> }
 
 async fn handle_decisions(State(state): State<AppState>, Json(req): Json<DecisionsReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.topic, 10_000, "topic") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_decisions", &req.topic).await;
     let all = state.db.search_nodes(&req.topic).await.unwrap_or_default();
     let decisions: Vec<SearchResult> = all.into_iter().filter(|m| m.node.node_type == crate::db::models::NODE_TYPE_DECISION || m.node.tags.iter().any(|t| t == "decision")).take(10).collect();
@@ -223,8 +170,6 @@ async fn handle_decisions(State(state): State<AppState>, Json(req): Json<Decisio
 #[derive(Serialize)] struct LearnResp { stored_id: String, action: String }
 
 async fn handle_learn(State(state): State<AppState>, Json(req): Json<LearnReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.observation, 50_000, "observation") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_learn", &req.observation).await;
     let pattern_type = req.pattern_type.unwrap_or_else(|| "general".to_string()).to_lowercase();
     let trigger_ids = req.trigger_node_id.map(|id| vec![id]).unwrap_or_default();
@@ -260,8 +205,6 @@ async fn handle_repair_delete(State(state): State<AppState>, Json(req): Json<Rep
 
 #[derive(Deserialize)] struct CritiqueReq { text: String }
 async fn handle_critique(State(state): State<AppState>, Json(req): Json<CritiqueReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.text, 50_000, "text") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_critique", &req.text).await;
     let rules: Vec<UserCognition> = state.db.with_conn(|conn| {
         let mut stmt = conn.prepare("SELECT id, timestamp, trigger_node_ids, pattern_type, extracted_rule, structured_rule, confidence, times_confirmed, times_contradicted, embedding, linked_to_nodes FROM user_cognition WHERE confidence > 0.5 LIMIT 200").map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
@@ -284,8 +227,6 @@ async fn handle_critique(State(state): State<AppState>, Json(req): Json<Critique
 
 #[derive(Deserialize)] struct HistoryReq { topic: String }
 async fn handle_history(State(state): State<AppState>, Json(req): Json<HistoryReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.topic, 10_000, "topic") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_history", &req.topic).await;
     let topic = req.topic.clone();
     let mut rows: Vec<serde_json::Value> = state.db.with_conn(move |conn| {
@@ -326,8 +267,6 @@ async fn handle_export_subgraph(State(state): State<AppState>, Json(req): Json<E
 
 #[derive(Deserialize)] struct PlanReq { task: String }
 async fn handle_plan(State(state): State<AppState>, Json(req): Json<PlanReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.task, 10_000, "task") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_plan", &req.task).await;
     let client = crate::embeddings::OllamaClient::new(state.db.config.ollama_url.clone(), state.db.config.embedding_model.clone());
     let related = if client.health_check().await { match client.generate_embedding(&req.task).await { Ok(emb) => state.db.vector_search(emb, 5).await.unwrap_or_default(), Err(_) => state.db.search_nodes(&req.task).await.unwrap_or_default() } } else { state.db.search_nodes(&req.task).await.unwrap_or_default() };
@@ -503,8 +442,6 @@ async fn handle_simulate_decision(
     State(state): State<AppState>,
     Json(req): Json<SimulateReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.question, 10_000, "question") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_simulate", &req.question).await;
     match crate::decision_simulator::simulate_decision(&state.db, &req.question).await {
         Ok(decision) => Json(serde_json::to_value(&decision).unwrap_or_default()).into_response(),
@@ -523,8 +460,6 @@ async fn handle_dialogue(
     State(state): State<AppState>,
     Json(req): Json<DialogueReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.topic, 10_000, "topic") { return resp.into_response(); }
     let _ = log_call(&state.db, "brain_dialogue", &req.topic).await;
     match crate::internal_dialogue::run_dialogue(&state.db, &req.topic).await {
         Ok(dialogue) => Json(serde_json::to_value(&dialogue).unwrap_or_default()).into_response(),
@@ -582,8 +517,6 @@ async fn handle_swarm_create_task(
     State(state): State<AppState>,
     Json(req): Json<SwarmTaskReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.title, 5_000, "title") { return resp.into_response(); }
     let _ = log_call(&state.db, "swarm_create_task", &req.title).await;
     match crate::swarm::create_task(
         &state.db,
@@ -605,8 +538,6 @@ async fn handle_swarm_decompose_goal(
     State(state): State<AppState>,
     Json(req): Json<SwarmGoalReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.goal, 5_000, "goal") { return resp.into_response(); }
     let _ = log_call(&state.db, "swarm_decompose_goal", &req.goal).await;
     match crate::swarm::decompose_goal(&state.db, &req.goal).await {
         Ok(tasks) => Json(serde_json::to_value(&tasks).unwrap_or_default()).into_response(),
@@ -645,8 +576,6 @@ async fn handle_world_simulate(
     State(state): State<AppState>,
     Json(req): Json<WorldSimulateReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.trigger, 10_000, "trigger") { return resp.into_response(); }
     let _ = log_call(&state.db, "world_simulate", &req.trigger).await;
     match crate::world_model::simulate_scenario(&state.db, &req.trigger).await {
         Ok(prediction) => Json(serde_json::to_value(&prediction).unwrap_or_default()).into_response(),
@@ -771,7 +700,6 @@ async fn handle_self_capabilities(
 async fn handle_self_compile(
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
     let _ = log_call(&state.db, "self_compile", "").await;
     let db_arc = state.db.clone();
     match crate::knowledge_compiler::compile_rules(&db_arc).await {
@@ -847,8 +775,6 @@ async fn handle_infra_register_node(
     State(state): State<AppState>,
     Json(req): Json<RegisterNodeReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.name, 5_000, "name") { return resp.into_response(); }
     crate::distributed::init_distributed(&state.db).await.ok();
     match crate::distributed::register_node(&state.db, req.name, req.role, req.endpoint_url).await
     {
@@ -906,9 +832,6 @@ async fn handle_sensory_get_streams(State(state): State<AppState>) -> impl IntoR
 struct AddStreamReq { name: String, stream_type: String, url: String, interval: Option<u64> }
 
 async fn handle_sensory_add_stream(State(state): State<AppState>, Json(req): Json<AddStreamReq>) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.name, 5_000, "name") { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.url, 5_000, "url") { return resp.into_response(); }
     match crate::data_streams::add_stream(&state.db, req.name, req.stream_type, req.url, req.interval.unwrap_or(60)).await {
         Ok(stream) => Json(serde_json::to_value(&stream).unwrap_or_default()).into_response(),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -943,8 +866,6 @@ async fn handle_federation_register(
     State(state): State<AppState>,
     Json(req): Json<FederationRegisterReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.name, 5_000, "name") { return resp.into_response(); }
     let _ = log_call(&state.db, "federation_register", &req.name).await;
     match crate::federation::register_brain(&state.db, req.name, req.endpoint_url).await {
         Ok(brain) => Json(serde_json::to_value(&brain).unwrap_or_default()).into_response(),
@@ -959,7 +880,6 @@ async fn handle_federation_share(
     State(state): State<AppState>,
     Json(req): Json<FederationShareReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
     let _ = log_call(&state.db, "federation_share", &req.brain_id).await;
     match crate::federation::share_knowledge(&state.db, &req.brain_id, req.node_ids).await {
         Ok(result) => Json(serde_json::json!({ "status": "ok", "result": result })).into_response(),
@@ -1004,7 +924,6 @@ async fn handle_federation_receive(
     State(state): State<AppState>,
     Json(req): Json<FederationReceiveReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
     let _ = log_call(&state.db, "federation_receive", &req.from_brain).await;
     match crate::federation::receive_knowledge(&state.db, req.from_brain, req.nodes).await {
         Ok(result) => Json(serde_json::json!({ "status": "ok", "result": result })).into_response(),
@@ -1023,8 +942,6 @@ async fn handle_economics_revenue(
     State(state): State<AppState>,
     Json(req): Json<EconRevenueReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.description, 10_000, "description") { return resp.into_response(); }
     let _ = log_call(&state.db, "economics_revenue", &req.source).await;
     match crate::economics::record_revenue(&state.db, req.source, req.amount, req.currency.unwrap_or_else(|| "ZAR".to_string()), req.description, req.attributed_to).await {
         Ok(event) => Json(serde_json::to_value(&event).unwrap_or_default()).into_response(),
@@ -1039,8 +956,6 @@ async fn handle_economics_cost(
     State(state): State<AppState>,
     Json(req): Json<EconCostReq>,
 ) -> impl IntoResponse {
-    if let Some(resp) = rate_limit_response() { return resp.into_response(); }
-    if let Err(resp) = validate_input(&req.description, 10_000, "description") { return resp.into_response(); }
     let _ = log_call(&state.db, "economics_cost", &req.cost_type).await;
     match crate::economics::record_cost(&state.db, req.cost_type, req.amount, req.description).await {
         Ok(cost) => Json(serde_json::to_value(&cost).unwrap_or_default()).into_response(),

@@ -18,13 +18,13 @@
 //! Open an elevated cmd.exe (Run as administrator):
 //!
 //! ```cmd
-//! sc create NeuroVault ^
+//! sc create ClaudeBrain ^
 //!   binPath= "C:\path\to\brain-headless.exe" ^
 //!   DisplayName= "NeuroVault" ^
 //!   start= auto
 //!
-//! sc description NeuroVault "Personal knowledge brain — autonomy + HTTP API"
-//! sc start NeuroVault
+//! sc description ClaudeBrain "Personal knowledge brain — autonomy + HTTP API"
+//! sc start ClaudeBrain
 //! ```
 //!
 //! Then verify with:
@@ -36,8 +36,8 @@
 //! ## Uninstall
 //!
 //! ```cmd
-//! sc stop NeuroVault
-//! sc delete NeuroVault
+//! sc stop ClaudeBrain
+//! sc delete ClaudeBrain
 //! ```
 //!
 //! ## Why a separate binary?
@@ -56,7 +56,7 @@
 //! - Survives user logout (true 24/7 operation)
 //!
 //! The Tauri desktop app can still run alongside the service. Both share
-//! the same database at `~/.neurovault/data/` (well — they
+//! the same SurrealDB at `~/.neurovault/data/surreal/` (well — they
 //! can't both write to it at the same time, since SurrealDB is
 //! single-process). In practice you run EITHER the desktop app OR the
 //! service, never both.
@@ -81,7 +81,7 @@ fn main() -> windows_service::Result<()> {
         return Ok(());
     }
 
-    service_dispatcher::start("NeuroVault", ffi_service_main)
+    service_dispatcher::start("ClaudeBrain", ffi_service_main)
 }
 
 #[cfg(feature = "windows-service-mode")]
@@ -111,7 +111,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
         }
     };
 
-    let status_handle = match service_control_handler::register("NeuroVault", event_handler) {
+    let status_handle = match service_control_handler::register("ClaudeBrain", event_handler) {
         Ok(h) => h,
         Err(e) => {
             eprintln!("Failed to register service control handler: {}", e);

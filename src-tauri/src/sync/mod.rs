@@ -1,5 +1,5 @@
-// AI assistant synchronization module
-// Watches AI assistant projects directory for new chat files and auto-imports them
+// Assistant Code synchronization module
+// Watches ~/.ai-assistant/projects/ for new chat files and auto-imports them
 
 use crate::db::models::*;
 use crate::db::BrainDb;
@@ -8,14 +8,7 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Returns the AI assistant's config directory name (under the user's home).
-fn ai_assistant_dir() -> &'static str {
-    // Constructed to avoid trademark string in source
-    const DIR: &str = concat!(".", "c", "l", "a", "u", "d", "e");
-    DIR
-}
-
-/// Start watching AI assistant directories for new/changed files
+/// Start watching Assistant Code directories for new/changed files
 pub fn start_file_watcher(db: Arc<BrainDb>) {
     std::thread::spawn(move || {
         let home = match dirs::home_dir() {
@@ -23,9 +16,9 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             None => return,
         };
 
-        let watch_dir = home.join(ai_assistant_dir()).join("projects");
+        let watch_dir = home.join(".ai-assistant").join("projects");
         if !watch_dir.exists() {
-            log::warn!("AI assistant projects directory not found: {:?}", watch_dir);
+            log::warn!("Assistant projects directory not found: {:?}", watch_dir);
             return;
         }
 
@@ -87,8 +80,8 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             return;
         }
 
-        // Also watch an external vault directory if configured
-        let vault_dir = home.join(ai_assistant_dir()).join("external-vault");
+        // Also watch the external-vault
+        let vault_dir = home.join(".ai-assistant").join("external-vault");
         if vault_dir.exists() {
             let _ = watcher.watch(&vault_dir, RecursiveMode::Recursive);
         }

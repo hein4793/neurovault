@@ -1,17 +1,17 @@
-//! Proactive Context Injector — the brain pushes context to your AI assistant
+//! Proactive Context Injector — the brain pushes context to Claude Code
 //! without being asked.
 //!
 //! Phase 1.2 of the master plan. The killer feature: instead of waiting
-//! for your AI assistant to call `brain_recall`, the brain *watches what your AI assistant
+//! for Claude Code to call `brain_recall`, the brain *watches what Claude
 //! Code is doing right now* and writes a markdown context file that
-//! your AI assistant reads on every prompt via the global AI assistant config
+//! Claude Code reads on every prompt via the global `~/.claude/CLAUDE.md`
 //! instructions.
 //!
 //! ## How it works
 //!
 //! 1. Every 30 seconds the loop wakes up.
 //! 2. Finds the **most recently modified** `*.jsonl` chat file under
-//!    the AI assistant projects directory. That's the AI assistant session the user is
+//!    `~/.claude/projects/`. That's the Claude Code session the user is
 //!    actively using right now.
 //! 3. Reads the last ~10 messages from that jsonl file.
 //! 4. Extracts a context query from them — title-ish keywords from the
@@ -20,13 +20,13 @@
 //!    plus loads the top user_cognition rules.
 //! 6. Writes a markdown summary to `~/.neurovault/export/active-context.md`.
 //!
-//! The AI assistant's global instructions tell every session to read that file at
+//! Claude Code's global CLAUDE.md tells every session to read that file at
 //! the start of each turn, so the brain's relevant knowledge for the
-//! current task automatically lands in your AI assistant's context window.
+//! current task automatically lands in Claude Code's context window.
 //!
 //! ## Design choices
 //!
-//! - **Read-only on the chat files.** We never write to the AI assistant projects directory.
+//! - **Read-only on the chat files.** We never write to `~/.claude/projects/`.
 //! - **Fast and bounded.** Each cycle reads ~10 lines, runs ONE
 //!   vector_search, writes ONE small file. Should take < 1 second.
 //! - **Idempotent.** Writes the whole context file every cycle. No
@@ -40,13 +40,6 @@ use crate::db::BrainDb;
 use crate::db::models::{SearchResult, UserCognition};
 use crate::error::BrainError;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-
-/// Returns the AI assistant's config directory name (under the user's home).
-fn ai_assistant_dir() -> &'static str {
-    // Constructed to avoid trademark string in source
-    const DIR: &str = concat!(".", "c", "l", "a", "u", "d", "e");
-    DIR
-}
 use rusqlite::params;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -59,7 +52,7 @@ use tokio::sync::mpsc;
 ///
 /// Uses a hybrid trigger model:
 /// 1. **Event-driven** (Phase 1.2B) — spawns its own file watcher on
-///    the AI assistant projects directory and runs an inject cycle within ~100ms of any
+///    `~/.claude/projects/` and runs an inject cycle within ~100ms of any
 ///    `.jsonl` change. This is the killer-feature low-latency path.
 /// 2. **Polling fallback** — also runs an inject cycle every 30s as a
 ///    safety net in case the watcher misses an event.
@@ -94,7 +87,7 @@ pub async fn run_context_injector(db: Arc<BrainDb>) {
         };
 
         // Debounce: if the last inject ran less than 2 seconds ago, skip.
-        // This collapses bursts of file events from a single your AI assistant
+        // This collapses bursts of file events from a single Claude Code
         // turn (one turn writes the jsonl multiple times).
         if last_inject.elapsed() < Duration::from_secs(2) {
             continue;
@@ -121,9 +114,9 @@ fn spawn_sidekick_watcher(tx: mpsc::Sender<PathBuf>) {
             Some(h) => h,
             None => return,
         };
-        let watch_dir = home.join(ai_assistant_dir()).join("projects");
+        let watch_dir = home.join(".claude").join("projects");
         if !watch_dir.exists() {
-            log::warn!("Sidekick watcher: AI assistant projects dir not found");
+            log::warn!("Sidekick watcher: ~/.claude/projects not found");
             return;
         }
 
@@ -175,9 +168,9 @@ async fn inject_once(
     last_session: &mut Option<PathBuf>,
     last_message_count: &mut usize,
 ) -> Result<(), String> {
-    // 1) Find the most recently active your AI assistant session
+    // 1) Find the most recently active Claude Code session
     let session = find_active_session()
-        .ok_or_else(|| "no active your AI assistant session found".to_string())?;
+        .ok_or_else(|| "no active Claude Code session found".to_string())?;
 
     let session_changed = last_session.as_deref() != Some(session.as_path());
     *last_session = Some(session.clone());
@@ -241,12 +234,12 @@ async fn inject_once(
 // Active session detection
 // =========================================================================
 
-/// Walk the AI assistant projects directory looking for the most recently modified
-/// `*.jsonl` file. That file represents the chat session your AI assistant is
+/// Walk `~/.claude/projects/*` looking for the most recently modified
+/// `*.jsonl` file. That file represents the chat session Claude Code is
 /// currently in.
 fn find_active_session() -> Option<PathBuf> {
     let home = dirs::home_dir()?;
-    let projects = home.join(ai_assistant_dir()).join("projects");
+    let projects = home.join(".claude").join("projects");
     if !projects.exists() {
         return None;
     }
@@ -295,7 +288,7 @@ fn walk_jsonl(dir: &Path, newest: &mut Option<(SystemTime, PathBuf)>, depth: usi
 // Message extraction
 // =========================================================================
 
-/// One human or assistant turn from a your AI assistant jsonl session.
+/// One human or assistant turn from a Claude Code jsonl session.
 struct Turn {
     role: String,
     text: String,
@@ -467,7 +460,7 @@ fn render_context(
     let mut md = String::new();
     md.push_str("# Active Context — NeuroVault\n\n");
     md.push_str("> Auto-written by the brain's proactive sidekick. ");
-    md.push_str("Reflects what the brain knows about your *current* your AI assistant session. ");
+    md.push_str("Reflects what the brain knows about your *current* Claude Code session. ");
     md.push_str("Refreshed every 30 seconds.\n\n");
     md.push_str(&format!("**Project:** `{}`\n", project));
     md.push_str(&format!("**Session:** `{}`\n", session));
@@ -532,7 +525,7 @@ fn short(s: &str, max: usize) -> String {
 // =========================================================================
 
 /// Public wrapper around `find_active_session` so other modules can find
-/// the most recently active your AI assistant jsonl session file.
+/// the most recently active Claude Code jsonl session file.
 pub fn find_active_session_pub() -> Option<PathBuf> {
     find_active_session()
 }

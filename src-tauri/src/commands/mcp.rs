@@ -1,4 +1,4 @@
-//! MCP (Model Context Protocol) commands — the bridge between your AI assistant
+//! MCP (Model Context Protocol) commands — the bridge between AI assistant
 //! and the brain.
 
 use crate::db::models::{SearchResult, UserCognition};

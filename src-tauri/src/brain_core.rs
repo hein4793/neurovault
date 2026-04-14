@@ -38,7 +38,7 @@
 //! 2. Add `windows-service = "0.7"` to Cargo.toml
 //! 3. Wrap `brain-headless`'s main() in a `windows_service::service_main`
 //!    handler that responds to start/stop/restart events.
-//! 4. Use `sc.exe create NeuroVault binPath= ...` to register.
+//! 4. Use `sc.exe create ClaudeBrain binPath= ...` to register.
 //!
 //! Total work: ~200 lines of new code, no refactoring needed thanks to
 //! this scaffold.
