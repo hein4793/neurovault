@@ -13,6 +13,11 @@ const navItems: { id: Panel; label: string; color?: string; svg: string }[] = [
   { id: "insights", label: "Brain Insights", color: "text-amber-400", svg: "M13 10V3L4 14h7v7l9-11h-7z" },
   { id: "autonomy", label: "Brain Autonomy", color: "text-emerald-400", svg: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" },
   { id: "activity" as Panel, label: "Brain Activity (Live)", color: "text-rose-400", svg: "M3 12h2l3-9 4 18 3-9h6" },
+  { id: "digital-twin" as Panel, label: "Digital Twin", color: "text-violet-400", svg: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
+  { id: "swarm" as Panel, label: "Agent Swarm", color: "text-orange-400", svg: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
+  { id: "world-model" as Panel, label: "World Model", color: "text-teal-400", svg: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
+  { id: "self-improve" as Panel, label: "Self-Improvement", color: "text-pink-400", svg: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" },
+  { id: "consciousness" as Panel, label: "Consciousness", color: "text-purple-400", svg: "M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" },
   { id: "backup", label: "Backup & Export", color: "text-cyan-400", svg: "M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" },
 ];
 

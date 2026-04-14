@@ -74,12 +74,6 @@ export interface BrainSettings {
   autonomy_learning_mins?: number;
   autonomy_export_mins?: number;
   autonomy_max_daily_research?: number;
-  // Onboarding
-  setup_completed?: boolean;
-  brain_name?: string;
-  enable_ai_assistant_sync?: boolean;
-  enable_file_watcher?: boolean;
-  watched_paths?: string[];
 }
 
 export interface AutoLinkResult { created: number; existing: number; total_nodes: number; }
@@ -185,34 +179,6 @@ export const getSettings = () => invoke<BrainSettings>("get_settings");
 export const updateSettings = (settings: BrainSettings) => invoke<BrainSettings>("update_settings", { settings });
 export const clearCache = () => invoke<string>("clear_cache");
 export const getBrainVersion = () => invoke<string>("get_brain_version");
-
-// ===== Onboarding Commands =====
-export interface SetupStatus {
-  setup_completed: boolean;
-}
-export interface OllamaStatus {
-  reachable: boolean;
-  models: OllamaModelInfo[];
-}
-export interface OllamaModelInfo {
-  name: string;
-  size: number;
-}
-export interface PullProgress {
-  status: string;
-  completed: boolean;
-  error: string | null;
-}
-export const getSetupStatus = () => invoke<SetupStatus>("get_setup_status");
-export const completeSetup = (params: {
-  brainName: string;
-  enableAiAssistantSync: boolean;
-  enableFileWatcher: boolean;
-  watchedPaths: string[];
-}) => invoke<SetupStatus>("complete_setup", params);
-export const checkOllamaStatus = () => invoke<OllamaStatus>("check_ollama_status");
-export const pullOllamaModel = (modelName: string) => invoke<PullProgress>("pull_ollama_model", { modelName });
-export const detectAiAssistantDirs = () => invoke<string[]>("detect_ai_assistant_dirs");
 
 // ===== Phase 3.1 — Installed Ollama models =====
 export interface InstalledModel {
@@ -432,6 +398,164 @@ export interface AutonomyStatus {
 export const getAutonomyStatus = () => invoke<AutonomyStatus>("get_autonomy_status");
 export const setAutonomyEnabled = (enabled: boolean) => invoke<void>("set_autonomy_enabled", { enabled });
 export const triggerAutonomyTask = (task: string) => invoke<string>("trigger_autonomy_task", { task });
+
+// ===== Phase Omega — Digital Twin Types =====
+export interface CognitiveFingerprint {
+  risk_tolerance: number;
+  decision_speed: number;
+  analytical_depth: number;
+  creativity: number;
+  pattern_recognition: number;
+  abstraction_level: number;
+  detail_orientation: number;
+  learning_agility: number;
+  synthesized_at: string;
+}
+export interface DecisionSimulation {
+  question: string;
+  prediction: string;
+  confidence: number;
+  reasoning: string;
+  alternatives: string[];
+}
+export interface DialogueTurn {
+  role: string;
+  content: string;
+}
+export interface InternalDialogue {
+  topic: string;
+  turns: DialogueTurn[];
+  synthesis: string;
+}
+export const getCognitiveFingerprint = () => invoke<CognitiveFingerprint>("get_cognitive_fingerprint");
+export const simulateDecision = (question: string) => invoke<DecisionSimulation>("simulate_decision", { question });
+export const runDialogue = (topic: string) => invoke<InternalDialogue>("run_dialogue", { topic });
+export const synthesizeFingerprint = () => invoke<CognitiveFingerprint>("synthesize_fingerprint");
+
+// ===== Phase Omega — Agent Swarm Types =====
+export interface SwarmAgent {
+  name: string;
+  capabilities: string[];
+  autonomy_level: number;
+  status: string;
+  current_task: string | null;
+}
+export interface SwarmTask {
+  id: string;
+  description: string;
+  assigned_agent: string | null;
+  status: string;
+  priority: number;
+  created_at: string;
+  completed_at: string | null;
+  result: string | null;
+}
+export interface SwarmStatus {
+  agents: SwarmAgent[];
+  active_tasks: number;
+  completed_tasks: number;
+  total_goals_decomposed: number;
+}
+export interface GoalDecomposition {
+  goal: string;
+  tasks: SwarmTask[];
+}
+export const getSwarmStatus = () => invoke<SwarmStatus>("get_swarm_status");
+export const getSwarmTasks = () => invoke<SwarmTask[]>("get_swarm_tasks");
+export const decomposeGoal = (goal: string) => invoke<GoalDecomposition>("decompose_goal", { goal });
+
+// ===== Phase Omega — World Model Types =====
+export interface WorldEntity {
+  id: string;
+  name: string;
+  entity_type: string;
+  properties: Record<string, string>;
+  created_at: string;
+}
+export interface CausalLink {
+  id: string;
+  cause: string;
+  effect: string;
+  strength: number;
+  evidence_count: number;
+}
+export interface Prediction {
+  id: string;
+  prediction: string;
+  confidence: number;
+  timeframe: string;
+  status: string;
+  created_at: string;
+  validated_at: string | null;
+}
+export interface ScenarioResult {
+  trigger: string;
+  predicted_effects: { effect: string; probability: number; timeframe: string }[];
+}
+export const getWorldEntities = () => invoke<WorldEntity[]>("get_world_entities");
+export const getCausalLinks = () => invoke<CausalLink[]>("get_causal_links");
+export const getPredictions = () => invoke<Prediction[]>("get_predictions");
+export const simulateScenarioCmd = (trigger: string) => invoke<ScenarioResult>("simulate_scenario_cmd", { trigger });
+
+// ===== Phase Omega — Self-Improvement Types =====
+export interface KnowledgeRule {
+  id: string;
+  rule_type: string;
+  condition: string;
+  action: string;
+  confidence: number;
+  accuracy: number;
+  times_applied: number;
+}
+export interface CircuitPerformance {
+  circuit_name: string;
+  total_runs: number;
+  success_rate: number;
+  avg_duration_ms: number;
+  efficiency_score: number;
+}
+export interface Capability {
+  name: string;
+  proficiency: number;
+  status: string;
+  last_improved: string | null;
+}
+export const getKnowledgeRules = () => invoke<KnowledgeRule[]>("get_knowledge_rules");
+export const getCircuitPerformance = () => invoke<CircuitPerformance[]>("get_circuit_performance");
+export const getCapabilities = () => invoke<Capability[]>("get_capabilities");
+export const compileRulesNow = () => invoke<string>("compile_rules_now");
+
+// ===== Phase Omega — Consciousness Types =====
+export interface SelfModel {
+  identity: string;
+  iq: number;
+  strongest_domains: string[];
+  weakest_domains: string[];
+  bottleneck: string;
+  priorities: string[];
+  last_updated: string;
+}
+export interface AttentionNode {
+  node_id: string;
+  title: string;
+  score: number;
+  reason: string;
+}
+export interface CuriosityTargetV2 {
+  topic: string;
+  strategy: string;
+  expected_gain: number;
+  reason: string;
+}
+export interface LearningVelocity {
+  domain: string;
+  velocity: number;
+  trend: string;
+}
+export const getSelfModel = () => invoke<SelfModel>("get_self_model");
+export const getAttentionWindow = () => invoke<AttentionNode[]>("get_attention_window");
+export const getCuriosityTargetsV2 = (limit: number) => invoke<CuriosityTargetV2[]>("get_curiosity_targets_v2", { limit });
+export const getLearningVelocity = () => invoke<LearningVelocity[]>("get_learning_velocity");
 
 // ===== Event Listener =====
 export const onBrainEvent = (callback: (event: BrainEventPayload) => void): Promise<UnlistenFn> =>

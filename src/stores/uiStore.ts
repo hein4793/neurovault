@@ -3,7 +3,9 @@ import { create } from "zustand";
 export type Panel =
   | "search" | "detail" | "ingest" | "stats" | "research"
   | "settings" | "ask" | "quality" | "learning" | "insights" | "backup"
-  | "autonomy" | "context" | "activity" | null;
+  | "autonomy" | "context" | "activity"
+  | "digital-twin" | "swarm" | "world-model" | "self-improve" | "consciousness"
+  | null;
 
 interface UiState {
   activePanel: Panel;
