@@ -1,5 +1,10 @@
 # NeuroVault
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/hein4793/neurovault/actions/workflows/ci.yml/badge.svg)](https://github.com/hein4793/neurovault/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/hein4793/neurovault?include_prereleases)](https://github.com/hein4793/neurovault/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/hein4793/neurovault)](https://github.com/hein4793/neurovault/stargazers)
+
 **A self-evolving 3D knowledge brain that runs entirely on your machine.**
 
 No cloud. No accounts. No telemetry.
@@ -120,6 +125,19 @@ NeuroVault's circuit system is extensible. Community-contributed circuits can ad
 - **Sharing**: Publish circuits as standalone crates or submit PRs to this repo
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on writing custom circuits.
+
+## Privacy & Security
+
+**Your data never leaves your machine.**
+
+- No cloud services, no accounts, no telemetry
+- All AI processing runs locally via Ollama
+- SQLite database stored in `~/.neurovault/`
+- HTTP API bound to localhost only (127.0.0.1)
+- CORS restricted to local origins
+- Rate limiting and input validation on all endpoints
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Contributing
 
