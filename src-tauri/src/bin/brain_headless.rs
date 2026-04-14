@@ -18,13 +18,13 @@
 //! Open an elevated cmd.exe (Run as administrator):
 //!
 //! ```cmd
-//! sc create ClaudeBrain ^
+//! sc create NeuroVault ^
 //!   binPath= "C:\path\to\brain-headless.exe" ^
 //!   DisplayName= "NeuroVault" ^
 //!   start= auto
 //!
-//! sc description ClaudeBrain "Personal knowledge brain — autonomy + HTTP API"
-//! sc start ClaudeBrain
+//! sc description NeuroVault "Personal knowledge brain — autonomy + HTTP API"
+//! sc start NeuroVault
 //! ```
 //!
 //! Then verify with:
@@ -36,8 +36,8 @@
 //! ## Uninstall
 //!
 //! ```cmd
-//! sc stop ClaudeBrain
-//! sc delete ClaudeBrain
+//! sc stop NeuroVault
+//! sc delete NeuroVault
 //! ```
 //!
 //! ## Why a separate binary?
@@ -81,7 +81,7 @@ fn main() -> windows_service::Result<()> {
         return Ok(());
     }
 
-    service_dispatcher::start("ClaudeBrain", ffi_service_main)
+    service_dispatcher::start("NeuroVault", ffi_service_main)
 }
 
 #[cfg(feature = "windows-service-mode")]
@@ -111,7 +111,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
         }
     };
 
-    let status_handle = match service_control_handler::register("ClaudeBrain", event_handler) {
+    let status_handle = match service_control_handler::register("NeuroVault", event_handler) {
         Ok(h) => h,
         Err(e) => {
             eprintln!("Failed to register service control handler: {}", e);
@@ -140,7 +140,7 @@ fn service_main(_arguments: Vec<std::ffi::OsString>) {
     };
 
     runtime.spawn(async {
-        match claude_brain_lib::headless_main().await {
+        match neurovault_lib::headless_main().await {
             Ok(_) => log::info!("brain-headless: started successfully"),
             Err(e) => log::error!("brain-headless: startup failed: {}", e),
         }
@@ -181,7 +181,7 @@ fn run_foreground() {
 
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
     runtime.block_on(async {
-        if let Err(e) = claude_brain_lib::headless_main().await {
+        if let Err(e) = neurovault_lib::headless_main().await {
             log::error!("Headless brain failed: {}", e);
         }
         // Run forever

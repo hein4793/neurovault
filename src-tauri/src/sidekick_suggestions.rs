@@ -17,7 +17,7 @@
 //! Runs every ~60 seconds (less aggressive than the context injector
 //! because LLM calls are involved). Each cycle:
 //!
-//! 1. Reads the most recently active Claude Code session's last few messages
+//! 1. Reads the most recently active your AI assistant session's last few messages
 //! 2. Pulls semantically related nodes via vector_search
 //! 3. Pulls top user_cognition rules
 //! 4. Asks the LLM (FAST tier) to categorize relevant items into the
@@ -78,7 +78,7 @@ async fn run_one_cycle(
 ) -> Result<(), String> {
     // Reuse the sidekick module's session detection
     let session = crate::sidekick::find_active_session_pub()
-        .ok_or_else(|| "no active Claude Code session found".to_string())?;
+        .ok_or_else(|| "no active your AI assistant session found".to_string())?;
 
     let session_changed = last_session.as_deref() != Some(session.as_path());
     *last_session = Some(session.clone());
@@ -261,7 +261,7 @@ fn render_markdown(s: &ActiveSuggestions) -> String {
     let mut md = String::new();
     md.push_str("# Active Suggestions — NeuroVault\n\n");
     md.push_str("> Auto-written by the brain's suggestion engine. ");
-    md.push_str("Refreshed every 60 seconds while you're in a Claude Code session.\n\n");
+    md.push_str("Refreshed every 60 seconds while you're in a your AI assistant session.\n\n");
     md.push_str(&format!("**Project:** `{}`\n", s.project));
     md.push_str(&format!("**Session:** `{}`\n", s.session));
     md.push_str(&format!("**Updated:** {}\n", s.generated_at));

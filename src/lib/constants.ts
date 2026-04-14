@@ -5,7 +5,7 @@ export const BRAIN_CENTER_Y = BRAIN_SCALE * 0.15;
 export const MAX_VISIBLE_NODES = 600;
 export const MAX_VISIBLE_EDGES = 800;
 
-// Skill agent names (top 20 Claude Code expert skills)
+// Skill agent names (top 20 AI assistant expert skills)
 export const SKILL_AGENTS = [
   "React", "TypeScript", "Python", "Rust", "Go", "Docker", "PostgreSQL",
   "GraphQL", "Next.js", "Tailwind", "FastAPI", "AWS", "Terraform",

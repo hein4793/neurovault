@@ -34,7 +34,7 @@ export function AskBrainPanel() {
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "brain", content: `Error: ${err}. Make sure Ollama is running or Claude API key is configured.` },
+        { role: "brain", content: `Error: ${err}. Make sure Ollama is running or your LLM API key is configured.` },
       ]);
     } finally {
       setIsThinking(false);

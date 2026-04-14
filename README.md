@@ -14,7 +14,7 @@ NeuroVault is a desktop knowledge management system that ingests your notes, cod
 - **31 Autonomous Circuits** -- Background processes that continuously improve your knowledge: cross-domain fusion, quality scoring, gap detection, pattern mining, curiosity-driven research, and more.
 - **IQ Scoring** -- A composite intelligence metric that tracks how connected, deep, and useful your knowledge is. Watch it climb as the brain self-improves.
 - **Semantic Search** -- HNSW vector index + FTS5 full-text search. Find anything instantly by meaning, not just keywords.
-- **MCP Integration** -- Ships with an MCP server that bridges Claude Code directly to your brain. Your AI coding assistant remembers everything.
+- **MCP Integration** -- Ships with an MCP server that bridges your AI assistant directly to your brain. Your AI coding assistant remembers everything.
 - **Phase Omega Systems**:
   - **Digital Twin** -- A self-model that tracks the brain's own strengths, weaknesses, and improvement priorities.
   - **Agent Swarm** -- Spawn autonomous research agents that investigate topics and report back.
@@ -25,7 +25,7 @@ NeuroVault is a desktop knowledge management system that ingests your notes, cod
   - **Sensory Expansion** -- Ingest images, audio, screenshots, and live data streams.
 - **Obsidian-Style Vault** -- Every node is also a plain markdown file with YAML frontmatter. Your data is always yours.
 - **Fine-Tuning Pipeline** -- Export your knowledge as training data and fine-tune a local LLM that thinks like you.
-- **Proactive Sidekick** -- Watches your Claude Code sessions and injects relevant context automatically.
+- **Proactive Sidekick** -- Watches your your AI assistant sessions and injects relevant context automatically.
 
 ## Quick Start
 
@@ -89,14 +89,14 @@ The headless binary runs the autonomy engine + HTTP API without the desktop GUI,
   data/brain.db          # SQLite database (WAL mode)
   data/hnsw.bin          # HNSW vector index
   vault/                 # Markdown files (Obsidian-compatible)
-  export/                # Auto-generated exports for Claude Code
+  export/                # Auto-generated exports for your AI assistant
   finetune/              # Training scripts and datasets
   backups/               # Automated backups
 ```
 
 ## MCP Server
 
-NeuroVault ships with an MCP server that lets Claude Code query your brain directly:
+NeuroVault ships with an MCP server that lets your AI assistant query your brain directly:
 
 ```json
 {

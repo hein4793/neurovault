@@ -97,7 +97,7 @@ export function SettingsPanel() {
                 className="w-full text-sm bg-brain-bg/50 border border-brain-border/50 rounded-lg px-3 py-2 text-brain-text font-mono outline-none focus:border-brain-accent/50"
               >
                 <option value="ollama">Ollama (Local)</option>
-                <option value="anthropic">Anthropic Claude API</option>
+                <option value="anthropic">Anthropic API</option>
               </select>
             </div>
             <Field label="Default LLM Model" value={settings.llm_model} onChange={(v) => setSettings({ ...settings, llm_model: v })} />

@@ -13,28 +13,28 @@
 //! ### OBSERVE
 //! Pulls recent activity signals from across the brain:
 //! - Last 20 entries from `autonomy_circuit_log` (what circuits ran, success/failure)
-//! - Last 20 entries from `mcp_call_log` (what Claude Code asked about)
+//! - Last 20 entries from `mcp_call_log` (what your AI assistant asked about)
 //! - Recent node creation rate per source_type
 //! - Recent thinking-node generation rate
 //!
 //! ### ANALYZE
 //! Identifies patterns and inefficiencies:
 //! - Are any circuits failing repeatedly? (-> flag for investigation)
-//! - What topics is Claude Code asking about most often? (-> research targets)
+//! - What topics is your AI assistant asking about most often? (-> research targets)
 //! - Are thinking nodes being generated, or is the brain just storing more facts?
 //! - Are quality / decay scores improving or degrading?
 //!
 //! ### IMPROVE
 //! Acts on the analysis. The current implementation is conservative — it
 //! creates an `insight` thinking node summarizing the cycle and queues
-//! research missions for hot Claude Code topics that the brain doesn't
+//! research missions for hot your AI assistant topics that the brain doesn't
 //! cover yet. Future iterations could rebalance circuit weights, archive
 //! stale nodes, or trigger targeted re-summarization.
 //!
 //! ### ACT
 //! Persists the cycle's findings to a new `master_loop_log` table so
 //! future cycles can compare trends, and writes the meta-insight node so
-//! both the user (via the Insights panel) and Claude Code (via
+//! both the user (via the Insights panel) and your AI assistant (via
 //! brain_recall) can see what the brain noticed about itself.
 
 use crate::commands::ai::get_llm_client_fast;
@@ -225,7 +225,7 @@ async fn observe(db: &BrainDb) -> Result<Observation, String> {
 struct Analysis {
     /// Circuits with > 2 failures and 0 successes — broken
     failing_circuits: Vec<String>,
-    /// Topics Claude Code is asking about repeatedly
+    /// Topics your AI assistant is asking about repeatedly
     hot_topics_from_mcp: Vec<String>,
     /// Ratio of thinking nodes to total new nodes
     thinking_ratio: f64,

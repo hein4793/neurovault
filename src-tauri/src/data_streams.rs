@@ -142,7 +142,7 @@ pub async fn poll_rss_stream(
 
     let resp = client
         .get(&stream.url)
-        .header("User-Agent", "ClaudeBrain/1.0")
+        .header("User-Agent", "NeuroVault/1.0")
         .send()
         .await
         .map_err(|e| BrainError::Http(e))?;
@@ -365,7 +365,7 @@ pub async fn poll_api_stream(
 
     let resp = client
         .get(&stream.url)
-        .header("User-Agent", "ClaudeBrain/1.0")
+        .header("User-Agent", "NeuroVault/1.0")
         .send()
         .await
         .map_err(|e| BrainError::Http(e))?;

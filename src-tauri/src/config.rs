@@ -44,13 +44,13 @@ impl BrainConfig {
 
     /// HTTP API port for the brain (Phase 1 — MCP bridge).
     pub fn http_api_port(&self) -> u16 {
-        std::env::var("CLAUDE_BRAIN_HTTP_PORT")
+        std::env::var("NEUROVAULT_HTTP_PORT")
             .ok()
             .and_then(|s| s.parse().ok())
             .unwrap_or(17777)
     }
 
-    /// Active context file the proactive sidekick writes for Claude Code.
+    /// Active context file the proactive sidekick writes for your AI assistant.
     pub fn active_context_path(&self) -> PathBuf {
         self.export_dir().join("active-context.md")
     }

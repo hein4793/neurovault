@@ -1,7 +1,7 @@
 {
   "name": "neurovault-mcp",
   "version": "0.1.0",
-  "description": "MCP server bridging Claude Code to the NeuroVault HTTP API",
+  "description": "MCP server bridging your AI assistant to the NeuroVault HTTP API",
   "type": "module",
   "main": "src/index.js",
   "bin": {

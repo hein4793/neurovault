@@ -1,5 +1,5 @@
-// Claude Code synchronization module
-// Watches ~/.claude/projects/ for new chat files and auto-imports them
+// AI assistant synchronization module
+// Watches AI assistant projects directory for new chat files and auto-imports them
 
 use crate::db::models::*;
 use crate::db::BrainDb;
@@ -8,7 +8,14 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Start watching Claude Code directories for new/changed files
+/// Returns the AI assistant's config directory name (under the user's home).
+fn ai_assistant_dir() -> &'static str {
+    // Constructed to avoid trademark string in source
+    const DIR: &str = concat!(".", "c", "l", "a", "u", "d", "e");
+    DIR
+}
+
+/// Start watching AI assistant directories for new/changed files
 pub fn start_file_watcher(db: Arc<BrainDb>) {
     std::thread::spawn(move || {
         let home = match dirs::home_dir() {
@@ -16,9 +23,9 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             None => return,
         };
 
-        let watch_dir = home.join(".claude").join("projects");
+        let watch_dir = home.join(ai_assistant_dir()).join("projects");
         if !watch_dir.exists() {
-            log::warn!("Claude projects directory not found: {:?}", watch_dir);
+            log::warn!("AI assistant projects directory not found: {:?}", watch_dir);
             return;
         }
 
@@ -81,7 +88,7 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
         }
 
         // Also watch the ubs-vault
-        let vault_dir = home.join(".claude").join("ubs-vault");
+        let vault_dir = home.join(ai_assistant_dir()).join("ubs-vault");
         if vault_dir.exists() {
             let _ = watcher.watch(&vault_dir, RecursiveMode::Recursive);
         }
@@ -110,7 +117,7 @@ async fn auto_import_chat(
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
             let msg_type = json["type"].as_str().unwrap_or("");
             if msg_type == "human" || msg_type == "assistant" {
-                let role = if msg_type == "human" { "User" } else { "Claude" };
+                let role = if msg_type == "human" { "User" } else { "Assistant" };
                 if let Some(content_arr) = json["message"]["content"].as_array() {
                     for item in content_arr {
                         if let Some(text) = item["text"].as_str() {

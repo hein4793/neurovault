@@ -18,7 +18,7 @@ const TOPIC_CATEGORIES: { label: string; color: string; topics: string[] }[] = [
     color: "text-purple-400",
     topics: [
       "Machine Learning", "Vector Database", "RAG", "LangChain",
-      "Anthropic Claude API", "OpenAI API", "Ollama", "LLM Fine-Tuning",
+      "Anthropic API", "OpenAI API", "Ollama", "LLM Fine-Tuning",
       "Hugging Face Transformers", "AI Agents", "Semantic Search",
     ],
   },

@@ -2,10 +2,10 @@
 /**
  * NeuroVault MCP Server
  * ------------------------
- * Stdio MCP server that bridges Claude Code <-> NeuroVault HTTP API.
+ * Stdio MCP server that bridges your AI assistant <-> NeuroVault HTTP API.
  *
  * Architecture:
- *   Claude Code  --(MCP/stdio)-->  this script  --(HTTP)-->  NeuroVault
+ *   AI assistant  --(MCP/stdio)-->  this script  --(HTTP)-->  NeuroVault
  *
  * Holds no state. Pure protocol translator.
  */
@@ -17,7 +17,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-const BRAIN_URL = process.env.CLAUDE_BRAIN_HTTP_URL || "http://127.0.0.1:17777";
+const BRAIN_URL = process.env.NEUROVAULT_HTTP_URL || "http://127.0.0.1:17777";
 
 // ---------------------------------------------------------------------------
 // HTTP helpers
@@ -192,7 +192,7 @@ const TOOLS = [
   {
     name: "brain_export_subgraph",
     description:
-      "Export a focused subgraph: the requested nodes plus their immediate neighbours and connecting edges. Use when you need a self-contained context pack for a specific task — gives Claude Code everything related to a small set of nodes in one call.",
+      "Export a focused subgraph: the requested nodes plus their immediate neighbours and connecting edges. Use when you need a self-contained context pack for a specific task — gives your AI assistant everything related to a small set of nodes in one call.",
     inputSchema: {
       type: "object",
       properties: {

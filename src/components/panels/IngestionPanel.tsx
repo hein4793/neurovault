@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useGraphStore } from "@/stores/graphStore";
-import { ingestUrl, ingestText, ingestFiles, importClaudeMemory, importChatHistory, getDomainColor, DOMAIN_COLORS } from "@/lib/tauri";
+import { ingestUrl, ingestText, ingestFiles, importAiMemory, importChatHistory, getDomainColor, DOMAIN_COLORS } from "@/lib/tauri";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -99,11 +99,11 @@ export function IngestionPanel() {
           isProcessing={isProcessing}
           onImport={async () => {
             setIsProcessing(true);
-            setStatus("Importing Claude memory...");
+            setStatus("Importing AI memory...");
             try {
-              const nodes = await importClaudeMemory();
+              const nodes = await importAiMemory();
               addNodes(nodes);
-              setStatus(`Imported ${nodes.length} nodes from Claude memory`);
+              setStatus(`Imported ${nodes.length} nodes from AI memory`);
             } catch (err) {
               setStatus(`Error: ${err}`);
             } finally {
@@ -450,17 +450,17 @@ function ImportPanel({ isProcessing, onImport }: { isProcessing: boolean; onImpo
   return (
     <div className="space-y-4">
       <div className="text-sm text-brain-muted">
-        Import knowledge from Claude Code memory, vault, and chat history.
+        Import knowledge from AI assistant memory, vault, and chat history.
       </div>
 
       <div className="space-y-2 text-xs font-mono text-brain-muted">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-brain-tech" />
-          ~/.claude/projects/*/memory/*.md
+          AI assistant projects/*/memory/*.md
         </div>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-brain-business" />
-          ~/.claude/ubs-vault/**/*.md
+          AI assistant vault/**/*.md
         </div>
       </div>
 
@@ -469,7 +469,7 @@ function ImportPanel({ isProcessing, onImport }: { isProcessing: boolean; onImpo
         disabled={isProcessing}
         className="w-full py-2 rounded-lg bg-brain-research/20 text-brain-research text-sm font-mono hover:bg-brain-research/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-brain-research/20"
       >
-        {isProcessing ? "Importing..." : "Import Claude Memory"}
+        {isProcessing ? "Importing..." : "Import AI Memory"}
       </button>
 
       {/* Chat History Import */}

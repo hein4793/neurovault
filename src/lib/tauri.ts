@@ -165,7 +165,7 @@ export const semanticSearch = (query: string, limit?: number) => invoke<SearchRe
 // ===== Ingestion Commands =====
 export const ingestUrl = (url: string) => invoke<GraphNode[]>("ingest_url", { url });
 export const ingestText = (params: { title: string; content: string; domain: string; topic: string }) => invoke<GraphNode>("ingest_text", params);
-export const importClaudeMemory = () => invoke<GraphNode[]>("import_claude_memory");
+export const importAiMemory = () => invoke<GraphNode[]>("import_ai_memory");
 export const importChatHistory = () => invoke<GraphNode[]>("import_chat_history");
 export const researchTopic = (topic: string) => invoke<GraphNode[]>("research_topic", { topic });
 export const researchBatch = (topics: string[]) => invoke<GraphNode[]>("research_batch", { topics });

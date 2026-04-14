@@ -26,7 +26,7 @@ impl McpClient {
     pub async fn fetch_docs(&self, url: &str) -> Result<McpToolResult, BrainError> {
         let resp = self.http
             .get(url)
-            .header("User-Agent", "ClaudeBrain/1.0")
+            .header("User-Agent", "NeuroVault/1.0")
             .send()
             .await
             .map_err(|e| BrainError::Ingestion(format!("MCP fetch failed: {}", e)))?;

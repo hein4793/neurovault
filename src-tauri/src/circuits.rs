@@ -1379,7 +1379,7 @@ async fn circuit_contradiction_detector(db: &Arc<BrainDb>) -> Result<String, Bra
 // Scans recent chat history for "we decided X because Y" / "going with Z"
 // patterns. The LLM extracts each decision plus its reasoning. Creates a
 // `decision` thinking node with `derived_from` edges back to the source
-// chat. This is the highest-value sidekick content — Claude Code can
+// chat. This is the highest-value sidekick content — your AI assistant can
 // later ask "what did we decide about X?" via the MCP `brain_decisions`
 // tool and get exact past reasoning.
 

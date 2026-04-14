@@ -111,7 +111,7 @@ pub async fn transcribe_audio(
     // Build a minimal multipart/form-data body manually (no reqwest
     // multipart feature needed). The whisper.cpp server expects a
     // multipart form with a "file" field containing the audio bytes.
-    let boundary = format!("----ClaudeBrain{}", uuid::Uuid::now_v7());
+    let boundary = format!("----NeuroVault{}", uuid::Uuid::now_v7());
     let mut body_bytes: Vec<u8> = Vec::new();
     body_bytes.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
     body_bytes.extend_from_slice(

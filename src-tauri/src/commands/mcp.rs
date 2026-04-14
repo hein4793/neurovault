@@ -1,4 +1,4 @@
-//! MCP (Model Context Protocol) commands — the bridge between Claude Code
+//! MCP (Model Context Protocol) commands — the bridge between your AI assistant
 //! and the brain.
 
 use crate::db::models::{SearchResult, UserCognition};
