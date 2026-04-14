@@ -22,17 +22,47 @@ import { BrainActivityPanel } from "@/components/panels/BrainActivityPanel";
 import { BrainPicker } from "@/components/hud/BrainPicker";
 import { ContextPanel } from "@/components/sidekick/ContextPanel";
 import { KeyboardShortcutHelp } from "@/components/panels/KeyboardShortcutHelp";
+import { OnboardingWizard } from "@/components/panels/OnboardingWizard";
 import { useBrainData } from "@/hooks/useBrainData";
 import { useBrainStats } from "@/hooks/useBrainStats";
 import { useSidekickEvents } from "@/hooks/useSidekickEvents";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useUiStore } from "@/stores/uiStore";
 import { useGraphStore } from "@/stores/graphStore";
+import { getSetupStatus } from "@/lib/tauri";
 
 export default function App() {
+  const [setupChecked, setSetupChecked] = useState(false);
+  const [setupCompleted, setSetupCompleted] = useState(true); // default true to avoid flash
+
   const { loadPhase } = useBrainData();
   const { activePanel } = useUiStore();
   const { selectedNode, isLoading } = useGraphStore();
+
+  // Check onboarding status on mount
+  useEffect(() => {
+    getSetupStatus()
+      .then((status) => {
+        setSetupCompleted(status.setup_completed);
+        setSetupChecked(true);
+      })
+      .catch(() => {
+        // If the command fails (DB not ready yet), retry after a delay
+        const timer = setTimeout(() => {
+          getSetupStatus()
+            .then((status) => {
+              setSetupCompleted(status.setup_completed);
+              setSetupChecked(true);
+            })
+            .catch(() => {
+              // Give up and show main app
+              setSetupCompleted(true);
+              setSetupChecked(true);
+            });
+        }, 2000);
+        return () => clearTimeout(timer);
+      });
+  }, []);
 
   // Initialize systems
   useBrainStats();
@@ -40,6 +70,15 @@ export default function App() {
   useKeyboardShortcuts();
 
   const showPanel = activePanel || selectedNode;
+
+  // Show onboarding wizard on first run
+  if (setupChecked && !setupCompleted) {
+    return (
+      <OnboardingWizard
+        onComplete={() => setSetupCompleted(true)}
+      />
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen bg-brain-bg overflow-hidden max-h-screen">

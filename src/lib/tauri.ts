@@ -74,6 +74,12 @@ export interface BrainSettings {
   autonomy_learning_mins?: number;
   autonomy_export_mins?: number;
   autonomy_max_daily_research?: number;
+  // Onboarding
+  setup_completed?: boolean;
+  brain_name?: string;
+  enable_ai_assistant_sync?: boolean;
+  enable_file_watcher?: boolean;
+  watched_paths?: string[];
 }
 
 export interface AutoLinkResult { created: number; existing: number; total_nodes: number; }
@@ -179,6 +185,34 @@ export const getSettings = () => invoke<BrainSettings>("get_settings");
 export const updateSettings = (settings: BrainSettings) => invoke<BrainSettings>("update_settings", { settings });
 export const clearCache = () => invoke<string>("clear_cache");
 export const getBrainVersion = () => invoke<string>("get_brain_version");
+
+// ===== Onboarding Commands =====
+export interface SetupStatus {
+  setup_completed: boolean;
+}
+export interface OllamaStatus {
+  reachable: boolean;
+  models: OllamaModelInfo[];
+}
+export interface OllamaModelInfo {
+  name: string;
+  size: number;
+}
+export interface PullProgress {
+  status: string;
+  completed: boolean;
+  error: string | null;
+}
+export const getSetupStatus = () => invoke<SetupStatus>("get_setup_status");
+export const completeSetup = (params: {
+  brainName: string;
+  enableAiAssistantSync: boolean;
+  enableFileWatcher: boolean;
+  watchedPaths: string[];
+}) => invoke<SetupStatus>("complete_setup", params);
+export const checkOllamaStatus = () => invoke<OllamaStatus>("check_ollama_status");
+export const pullOllamaModel = (modelName: string) => invoke<PullProgress>("pull_ollama_model", { modelName });
+export const detectAiAssistantDirs = () => invoke<string[]>("detect_ai_assistant_dirs");
 
 // ===== Phase 3.1 — Installed Ollama models =====
 export interface InstalledModel {

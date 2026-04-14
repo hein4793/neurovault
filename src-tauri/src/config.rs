@@ -6,6 +6,28 @@ pub struct BrainConfig {
     pub data_dir: PathBuf,
     pub ollama_url: String,
     pub embedding_model: String,
+    /// Whether the first-run onboarding wizard has been completed.
+    #[serde(default)]
+    pub setup_completed: bool,
+    /// User-chosen name for their brain instance.
+    #[serde(default = "default_brain_name")]
+    pub brain_name: String,
+    /// Watch AI assistant chat history directories for auto-ingestion.
+    #[serde(default = "default_true")]
+    pub enable_ai_assistant_sync: bool,
+    /// Watch user-configured directories for file changes.
+    #[serde(default)]
+    pub enable_file_watcher: bool,
+    /// User-configurable directories to watch for knowledge ingestion.
+    #[serde(default)]
+    pub watched_paths: Vec<PathBuf>,
+}
+
+fn default_brain_name() -> String {
+    "My Brain".to_string()
+}
+fn default_true() -> bool {
+    true
 }
 
 impl Default for BrainConfig {
@@ -18,6 +40,11 @@ impl Default for BrainConfig {
             data_dir,
             ollama_url: "http://localhost:11434".to_string(),
             embedding_model: "nomic-embed-text".to_string(),
+            setup_completed: false,
+            brain_name: "My Brain".to_string(),
+            enable_ai_assistant_sync: true,
+            enable_file_watcher: false,
+            watched_paths: Vec::new(),
         }
     }
 }

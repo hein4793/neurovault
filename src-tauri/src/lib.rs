@@ -299,6 +299,12 @@ pub fn run() {
             commands::settings::update_settings,
             commands::settings::clear_cache,
             commands::settings::get_brain_version,
+            // Onboarding
+            commands::settings::get_setup_status,
+            commands::settings::complete_setup,
+            commands::settings::check_ollama_status,
+            commands::settings::pull_ollama_model,
+            commands::settings::detect_ai_assistant_dirs,
             // Quality
             commands::quality::calculate_quality,
             commands::quality::calculate_decay,
