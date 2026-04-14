@@ -9,6 +9,7 @@
 
 use crate::db::BrainDb;
 use crate::error::BrainError;
+use crate::commands::compact::validate_table_name;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
@@ -65,6 +66,11 @@ pub async fn delete_corrupted_inner(
 ) -> Result<u64, BrainError> {
     let mut deleted = 0u64;
     for rec in records {
+        // Validate table name against allowlist before using in SQL
+        if let Err(e) = validate_table_name(&rec.table) {
+            log::error!("Repair: rejected table name '{}' — {}", rec.table, e);
+            continue;
+        }
         let table = rec.table.clone();
         let key = rec.record_key.clone();
         match db.with_conn(move |conn| {
@@ -90,6 +96,7 @@ pub async fn delete_corrupted_inner(
 /// Internal: scan one table for issues. With SQLite this checks row count
 /// and runs a quick integrity check rather than per-record reads.
 async fn scan_table(db: &BrainDb, table: &str) -> Result<RepairScanResult, BrainError> {
+    validate_table_name(table)?;
     let start = std::time::Instant::now();
     let table_owned = table.to_string();
 

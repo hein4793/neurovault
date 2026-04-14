@@ -130,12 +130,50 @@ pub async fn get_settings(db: State<'_, Arc<BrainDb>>) -> Result<BrainSettings, 
     }
 }
 
+/// Validate settings values to prevent dangerous configurations.
+fn validate_settings(settings: &BrainSettings) -> Result<(), BrainError> {
+    // ollama_url must point to localhost only
+    if !settings.ollama_url.starts_with("http://localhost")
+        && !settings.ollama_url.starts_with("http://127.0.0.1")
+    {
+        return Err(BrainError::Database(
+            "ollama_url must start with http://localhost or http://127.0.0.1".to_string(),
+        ));
+    }
+
+    // embedding_model must be alphanumeric + hyphens + colons + dots + underscores + slashes only
+    if !settings.embedding_model.chars().all(|c| c.is_alphanumeric() || c == '-' || c == ':' || c == '.' || c == '_' || c == '/') {
+        return Err(BrainError::Database(
+            "embedding_model contains invalid characters (only alphanumeric, hyphens, colons, dots, underscores, slashes allowed)".to_string(),
+        ));
+    }
+
+    // Autonomy intervals must be > 0
+    if settings.autonomy_linking_mins == 0 {
+        return Err(BrainError::Database("autonomy_linking_mins must be > 0".to_string()));
+    }
+    if settings.autonomy_quality_mins == 0 {
+        return Err(BrainError::Database("autonomy_quality_mins must be > 0".to_string()));
+    }
+    if settings.autonomy_learning_mins == 0 {
+        return Err(BrainError::Database("autonomy_learning_mins must be > 0".to_string()));
+    }
+    if settings.autonomy_export_mins == 0 {
+        return Err(BrainError::Database("autonomy_export_mins must be > 0".to_string()));
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn update_settings(
     app: tauri::AppHandle,
     db: State<'_, Arc<BrainDb>>,
     settings: BrainSettings,
 ) -> Result<BrainSettings, BrainError> {
+    // Validate settings before persisting
+    validate_settings(&settings)?;
+
     let path = settings_path(&db);
     let data = serde_json::to_string_pretty(&settings)
         .map_err(|e| BrainError::Serialization(e))?;

@@ -262,6 +262,11 @@ pub async fn run_finetune(db: &BrainDb, timestamp: &str) -> Result<String, Strin
         return Err(format!("script file missing: {}", script_path));
     }
 
+    // Validate path doesn't contain shell metacharacters to prevent injection
+    if !is_safe_path(&script_path) {
+        return Err(format!("script path contains unsafe characters: {}", script_path));
+    }
+
     // Mark as running
     let now = chrono::Utc::now().to_rfc3339();
     let ts_for_update = timestamp.to_string();
@@ -362,6 +367,13 @@ pub async fn run_finetune(db: &BrainDb, timestamp: &str) -> Result<String, Strin
             Err(msg)
         }
     }
+}
+
+/// Validate that a path doesn't contain shell metacharacters that could
+/// enable command injection when passed to subprocess arguments.
+fn is_safe_path(p: &str) -> bool {
+    !p.contains('|') && !p.contains(';') && !p.contains('&') && !p.contains('`')
+        && !p.contains('$') && !p.contains('\n') && !p.contains('\r')
 }
 
 /// Cheap PATH check for an executable name.

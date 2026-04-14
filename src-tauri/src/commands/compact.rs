@@ -22,6 +22,35 @@ use std::io::Write;
 use std::sync::Arc;
 use tauri::State;
 
+/// Allowlist of table names permitted in dynamic SQL queries.
+/// Prevents SQL injection even though table names come from hardcoded lists.
+pub const ALLOWED_TABLES: &[&str] = &[
+    "nodes", "edges", "embeddings", "user_cognition", "autonomy_circuit_log",
+    "autonomy_circuit_rotation", "autonomy_state", "research_missions",
+    "sync_state", "learning_log", "user_profile", "user_interaction",
+    "projects", "node_archive", "mcp_call_log", "compression_log",
+    "master_loop_log", "memory_tier_log", "fine_tune_run", "cold_archive_log",
+    "brains", "active_brain_state", "synapse_prune_log", "cognitive_fingerprint",
+    "knowledge_rules", "circuit_performance", "capabilities", "world_entities",
+    "causal_links", "temporal_patterns", "future_predictions", "self_model",
+    "attention_focus", "learning_velocity", "swarm_agents", "swarm_tasks",
+    "swarm_messages", "visual_analysis", "transcriptions", "data_streams",
+    "stream_events", "federated_brains", "federation_messages", "shared_knowledge",
+    "revenue_events", "compute_costs", "brain_nodes", "edge_devices", "sync_log",
+];
+
+/// Validate that a table name is in the allowlist. Returns an error if not.
+pub fn validate_table_name(table: &str) -> Result<(), BrainError> {
+    if ALLOWED_TABLES.contains(&table) {
+        Ok(())
+    } else {
+        Err(BrainError::Database(format!(
+            "Table name '{}' is not in the allowed tables list",
+            table
+        )))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionResult {
     pub table: String,
@@ -110,6 +139,7 @@ async fn export_table(
     table: &str,
     path: &std::path::Path,
 ) -> Result<CompactionResult, BrainError> {
+    validate_table_name(table)?;
     log::info!("Compaction: exporting table '{}'...", table);
 
     let table_owned = table.to_string();
@@ -247,6 +277,7 @@ async fn import_table_from_jsonl(
     table: &str,
     path: &std::path::Path,
 ) -> Result<CompactionResult, BrainError> {
+    validate_table_name(table)?;
     log::info!("Compaction import: loading {} from {}...", table, path.display());
 
     let content = std::fs::read_to_string(path)?;

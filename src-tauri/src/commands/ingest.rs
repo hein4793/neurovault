@@ -1106,6 +1106,12 @@ async fn ingest_single_file(
     db: &Arc<BrainDb>,
     file_path: &std::path::Path,
 ) -> Result<Vec<GraphNode>, BrainError> {
+    // Reject paths with traversal sequences to prevent directory escape
+    let path_str = file_path.to_string_lossy();
+    if path_str.contains("..") {
+        return Err(BrainError::Ingestion("Path traversal not allowed".to_string()));
+    }
+
     let file_name = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("untitled");
     let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
 
