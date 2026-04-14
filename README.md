@@ -87,7 +87,36 @@ The headless binary runs the autonomy engine + HTTP API without the desktop GUI,
 | LLM / Embeddings | Ollama (local) or Anthropic API |
 | MCP Bridge | Node.js stdio server |
 
+## Why NeuroVault?
+
+| Feature | NeuroVault | Obsidian | AnythingLLM | Mem0 | Khoj |
+|---------|-----------|----------|-------------|------|------|
+| Fully local (no cloud) | ✅ | ✅ | ✅ | ❌ | Partial |
+| Knowledge graph | ✅ | Plugin | ❌ | ❌ | ❌ |
+| Self-improving AI | ✅ (31 circuits) | ❌ | ❌ | ❌ | ❌ |
+| 3D visualization | ✅ | ❌ | ❌ | ❌ | ❌ |
+| IQ scoring | ✅ | ❌ | ❌ | ❌ | ❌ |
+| MCP integration | ✅ | ❌ | ❌ | ❌ | ❌ |
+| PDF/DOCX ingestion | ✅ | ✅ | ✅ | ❌ | ✅ |
+| Embedded DB | ✅ (SQLite) | ✅ | ✅ | ❌ | ❌ |
+| Agent swarm | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Cognitive fingerprint | ✅ | ❌ | ❌ | ❌ | ❌ |
+
 ## Architecture
+
+### 31 Self-Improvement Circuits
+
+| Category | Circuits | Purpose |
+|----------|----------|---------|
+| **Core** | quality_recalc, auto_link, iq_boost, synapse_prune | Graph maintenance |
+| **Cognition** | meta_reflection, user_pattern_mining, self_synthesis, self_assessment | Learn about the user |
+| **Research** | curiosity_gap_fill, cross_domain_fusion, knowledge_synthesizer | Discover new knowledge |
+| **Reasoning** | contradiction_detector, hypothesis_tester, prediction_validator, decision_memory_extractor | Build logical models |
+| **Phase Omega** | fingerprint_synthesis, internal_dialogue, swarm_orchestrator, temporal_analysis, causal_model_builder, knowledge_compiler, circuit_optimizer, capability_tracker, self_reflection, attention_update, curiosity_v2, federation_sync, cluster_health_check, economic_audit, scenario_simulator, code_pattern_extractor, compression_cycle | Advanced autonomy |
+
+Every 20 minutes, one circuit fires. 72 improvement cycles per day. The brain gets smarter while you sleep.
+
+### Data Layout
 
 ```
 ~/.neurovault/
