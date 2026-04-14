@@ -33,3 +33,5 @@ Thumbs.db
 # Tauri dev
 src-tauri/target/
 src-tauri/target
+src-tauri/target/
+src-tauri/gen/
