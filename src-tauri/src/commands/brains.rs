@@ -9,7 +9,7 @@
 //! - The "main" brain always exists and contains every node with
 //!   `brain_id = None` (back-compat for the existing 800K nodes).
 //! - Additional brains are rows in the `brains` table with a unique
-//!   slug (e.g. "work", "personal", "ubs").
+//!   slug (e.g. "work", "personal", "research").
 //! - The `active_brain_state` singleton row tracks which brain the user
 //!   is currently viewing.
 //! - When the user creates new content, the brain stamps `brain_id` with

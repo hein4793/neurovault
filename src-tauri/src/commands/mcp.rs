@@ -576,7 +576,7 @@ pub async fn brain_plan(
         context.push('\n');
     }
     if !rules.is_empty() {
-        context.push_str("HEIN'S ESTABLISHED PREFERENCES:\n");
+        context.push_str("USER'S ESTABLISHED PREFERENCES:\n");
         for r in rules.iter().take(5) {
             context.push_str(&format!("- ({}) {}\n", r.pattern_type, r.extracted_rule));
         }

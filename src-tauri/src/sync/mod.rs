@@ -87,8 +87,8 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             return;
         }
 
-        // Also watch the ubs-vault
-        let vault_dir = home.join(ai_assistant_dir()).join("ubs-vault");
+        // Also watch an external vault directory if configured
+        let vault_dir = home.join(ai_assistant_dir()).join("external-vault");
         if vault_dir.exists() {
             let _ = watcher.watch(&vault_dir, RecursiveMode::Recursive);
         }

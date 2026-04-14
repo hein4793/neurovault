@@ -336,10 +336,12 @@ pub async fn pull_ollama_model(
 pub async fn detect_ai_assistant_dirs() -> Result<Vec<String>, BrainError> {
     let mut dirs_found = Vec::new();
     if let Some(home) = dirs::home_dir() {
-        // Check for Claude-style projects directory
-        let claude_dir = home.join(".claude").join("projects");
-        if claude_dir.exists() {
-            dirs_found.push(claude_dir.to_string_lossy().to_string());
+        // Check for AI assistant project directories
+        for dir_name in &[".claude", ".cursor", ".continue"] {
+            let ai_dir = home.join(dir_name).join("projects");
+            if ai_dir.exists() {
+                dirs_found.push(ai_dir.to_string_lossy().to_string());
+            }
         }
         // Check for Copilot chat directory
         let copilot_dir = home.join(".config").join("github-copilot");

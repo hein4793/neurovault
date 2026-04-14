@@ -74,7 +74,7 @@ pub async fn calculate_quality_scores(db: &BrainDb) -> Result<(u64, u64), BrainE
             let source_score = match source_type.as_str() {
                 "research" => 0.15,
                 "web" => 0.14,
-                "manual" | "ai_memory" | "ubs_vault" => 0.13,
+                "manual" | "ai_memory" | "external_vault" => 0.13,
                 "project" | "file" => 0.12,
                 "auto_sync" => 0.11,
                 "chat_history" => 0.10,

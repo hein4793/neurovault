@@ -31,7 +31,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevenueEvent {
     pub id: String,
-    pub source: String,           // "ubs", "hpm", "brain_action", "manual"
+    pub source: String,           // "project_a", "project_b", "brain_action", "manual"
     pub amount: f64,
     pub currency: String,
     pub description: String,
