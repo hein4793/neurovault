@@ -5,15 +5,36 @@ dist/
 .next/
 
 # Brain data (personal — never commit)
+# Belt-and-suspenders: data lives at ~/.neurovault/ outside the repo,
+# but guard against any accidental in-repo copy.
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite-journal
 *.bin
+*.parquet
+*.jsonl
 data/
 vault/
 export/
 backups/
 compaction/
+cold/
+cold_storage/
+finetune/
+logs/
+cache/
+.neurovault/
+settings.json
+
+# Brain export artifacts (personal content)
+brain-knowledge.json
+brain-briefing.md
+brain-index.json
+training-data.jsonl
+active-context.md
+active-suggestions.md
 
 # IDE
 .vscode/

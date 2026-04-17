@@ -11,6 +11,12 @@ No cloud. No accounts. No telemetry.
 
 NeuroVault is a desktop knowledge management system that ingests your notes, code, conversations, and documents, then organizes them into a living 3D knowledge graph that grows smarter over time through autonomous circuits.
 
+<p align="center">
+  <img src="docs/images/neurovault-brain.png" alt="NeuroVault 3D Brain - 222K neurons, IQ 107/200" width="900" />
+  <br />
+  <em>222,972 neurons, 284,906 synapses, IQ 107/200 -- the brain grows and self-improves 24/7</em>
+</p>
+
 ---
 
 ## Features
@@ -30,13 +36,13 @@ NeuroVault is a desktop knowledge management system that ingests your notes, cod
   - **Sensory Expansion** -- Ingest images, audio, screenshots, and live data streams.
 - **Obsidian-Style Vault** -- Every node is also a plain markdown file with YAML frontmatter. Your data is always yours.
 - **Fine-Tuning Pipeline** -- Export your knowledge as training data and fine-tune a local LLM that thinks like you.
-- **Proactive Sidekick** -- Watches your your AI assistant sessions and injects relevant context automatically.
+- **Proactive Sidekick** -- Watches your AI assistant sessions and injects relevant context automatically.
 
 ## Quick Start
 
 ### Download
 
-Pre-built binaries for Windows, macOS, and Linux are available on the [Releases](https://github.com/neurovault/neurovault/releases) page.
+Pre-built binaries for Windows, macOS, and Linux are available on the [Releases](https://github.com/hein4793/neurovault/releases) page.
 
 ### Build from Source
 
@@ -48,7 +54,7 @@ Pre-built binaries for Windows, macOS, and Linux are available on the [Releases]
 
 ```bash
 # Clone the repo
-git clone https://github.com/neurovault/neurovault.git
+git clone https://github.com/hein4793/neurovault.git
 cd neurovault
 
 # Install frontend dependencies
@@ -167,6 +173,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for details on writing custom circuits.
 - Rate limiting and input validation on all endpoints
 
 See [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+## Documentation
+
+- [INSTALL.md](docs/INSTALL.md) — platform-by-platform install walkthrough
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — how the system fits together
+- [CIRCUIT_CATALOG.md](docs/CIRCUIT_CATALOG.md) — every circuit, what it does, how it fails
+- [CIRCUIT_GUIDE.md](docs/CIRCUIT_GUIDE.md) — authoring guide for new circuits
+- [MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md) — wire the brain into your AI assistant
+- [API_REFERENCE.md](docs/API_REFERENCE.md) — HTTP API reference
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — when things go wrong
 
 ## Contributing
 

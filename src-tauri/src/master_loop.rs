@@ -155,7 +155,7 @@ async fn observe(db: &BrainDb) -> Result<Observation, String> {
     // Last 30 mcp calls
     obs.recent_mcp_calls = db.with_conn(|conn| -> Result<Vec<McpCallRow>, BrainError> {
         let mut stmt = conn.prepare(
-            "SELECT command, payload, called_at FROM mcp_call_log ORDER BY called_at DESC LIMIT 30"
+            "SELECT tool_name, args, called_at FROM mcp_call_log ORDER BY called_at DESC LIMIT 30"
         ).map_err(|e| BrainError::Database(e.to_string()))?;
         let rows = stmt.query_map([], |row| {
             Ok(McpCallRow {

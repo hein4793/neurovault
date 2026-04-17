@@ -1,5 +1,9 @@
-// Assistant Code synchronization module
-// Watches ~/.ai-assistant/projects/ for new chat files and auto-imports them
+// AI assistant chat synchronization module.
+//
+// Watches one or more chat-session directories and auto-imports .jsonl session
+// files and memory markdown into the brain. By default it auto-detects common
+// AI coding assistant paths; users can override via the `NEUROVAULT_CHAT_DIRS`
+// environment variable (paths separated by `;` on Windows, `:` elsewhere).
 
 use crate::db::models::*;
 use crate::db::BrainDb;
@@ -8,7 +12,32 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Start watching Assistant Code directories for new/changed files
+/// Resolve the list of chat directories to watch.
+///
+/// Order of precedence:
+/// 1. `NEUROVAULT_CHAT_DIRS` env var (separator-delimited absolute paths).
+/// 2. Auto-detected well-known paths for common AI coding assistants.
+///    Only paths that currently exist on disk are returned.
+fn resolve_chat_dirs(home: &std::path::Path) -> Vec<PathBuf> {
+    if let Ok(env_val) = std::env::var("NEUROVAULT_CHAT_DIRS") {
+        let sep = if cfg!(windows) { ';' } else { ':' };
+        return env_val
+            .split(sep)
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+            .filter(|p| p.exists())
+            .collect();
+    }
+
+    let candidates = [
+        home.join(".claude").join("projects"),
+        home.join(".ai-assistant").join("projects"),
+        home.join(".cursor").join("chats"),
+    ];
+    candidates.into_iter().filter(|p| p.exists()).collect()
+}
+
+/// Start watching AI-assistant chat directories for new/changed files
 pub fn start_file_watcher(db: Arc<BrainDb>) {
     std::thread::spawn(move || {
         let home = match dirs::home_dir() {
@@ -16,13 +45,17 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             None => return,
         };
 
-        let watch_dir = home.join(".ai-assistant").join("projects");
-        if !watch_dir.exists() {
-            log::warn!("Assistant projects directory not found: {:?}", watch_dir);
+        let watch_dirs = resolve_chat_dirs(&home);
+        if watch_dirs.is_empty() {
+            log::warn!(
+                "No AI assistant chat directories found. Set NEUROVAULT_CHAT_DIRS to watch custom paths."
+            );
             return;
         }
 
-        log::info!("Starting file watcher on {:?}", watch_dir);
+        for d in &watch_dirs {
+            log::info!("Starting file watcher on {:?}", d);
+        }
 
         let db_clone = db.clone();
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -75,15 +108,21 @@ pub fn start_file_watcher(db: Arc<BrainDb>) {
             }
         };
 
-        if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::Recursive) {
-            log::error!("Failed to watch directory: {}", e);
-            return;
+        for d in &watch_dirs {
+            if let Err(e) = watcher.watch(d, RecursiveMode::Recursive) {
+                log::error!("Failed to watch {:?}: {}", d, e);
+            }
         }
 
-        // Also watch the external-vault
-        let vault_dir = home.join(".ai-assistant").join("external-vault");
-        if vault_dir.exists() {
-            let _ = watcher.watch(&vault_dir, RecursiveMode::Recursive);
+        // Also watch any sibling external-vault directories next to a watched
+        // chat directory (e.g. ~/.claude/external-vault).
+        for d in &watch_dirs {
+            if let Some(parent) = d.parent() {
+                let vault = parent.join("external-vault");
+                if vault.exists() {
+                    let _ = watcher.watch(&vault, RecursiveMode::Recursive);
+                }
+            }
         }
 
         log::info!("File watcher started successfully");
