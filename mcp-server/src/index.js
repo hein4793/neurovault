@@ -220,6 +220,114 @@ const TOOLS = [
       required: ["task"],
     },
   },
+  // Phase 2 — Dual-Brain Learning Tools
+  {
+    name: "brain_warnings",
+    description:
+      "Query past mistakes, bugs, gotchas, and contradictions the brain has recorded. Use BEFORE making changes in an area where past issues occurred — catches pitfalls before they bite.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Topic to search for warnings about.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "brain_rules",
+    description:
+      "Query compiled deterministic rules (if/then, always, never, prefer). These are high-confidence machine-parseable rules extracted from behavioral patterns and decisions. Use to check established patterns before making style or architecture choices.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        context: {
+          type: "string",
+          description: "Optional context to filter matching rules. Omit to get all active rules.",
+        },
+      },
+    },
+  },
+  {
+    name: "brain_learn_decision",
+    description:
+      "Record a decision with full reasoning so the brain remembers WHY a choice was made. Use when you and the user make a significant architectural, technical, or design decision.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        topic: {
+          type: "string",
+          description: "What the decision is about (e.g. 'UBS payment gateway').",
+        },
+        choice: {
+          type: "string",
+          description: "What was chosen (e.g. 'Stripe').",
+        },
+        reasoning: {
+          type: "string",
+          description: "Why this choice was made.",
+        },
+        alternatives: {
+          type: "array",
+          items: { type: "string" },
+          description: "Other options that were considered.",
+        },
+        confidence: {
+          type: "number",
+          description: "How confident in this decision (0.0-1.0). Default 0.8.",
+        },
+      },
+      required: ["topic", "choice", "reasoning"],
+    },
+  },
+  {
+    name: "brain_learn_pattern",
+    description:
+      "Record a behavioral pattern or preference. Use when you observe how the user likes to work, or when the user explicitly says 'remember that I prefer X'. The brain will surface this pattern in future sessions.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        observation: {
+          type: "string",
+          description: "The pattern itself (e.g. 'User prefers explicit error types over Box<dyn Error>').",
+        },
+        pattern_type: {
+          type: "string",
+          description: "Category: coding_style | debug_flow | planning | refactoring | naming | tooling | communication | decision_making | testing | error_handling | general.",
+        },
+        confidence: {
+          type: "number",
+          description: "How confident (0.0-1.0). Default 0.7.",
+        },
+      },
+      required: ["observation"],
+    },
+  },
+  {
+    name: "brain_learn_mistake",
+    description:
+      "Record a mistake, bug, or gotcha so the brain warns about it in future sessions. Use when something breaks unexpectedly, when a workaround is needed, or when a past approach caused problems.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short title for the warning (e.g. 'Stripe webhook retry causes duplicates').",
+        },
+        description: {
+          type: "string",
+          description: "Full description of what went wrong and how to avoid it.",
+        },
+        severity: {
+          type: "string",
+          description: "high | medium | low. Default medium.",
+        },
+      },
+      required: ["title", "description"],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -312,6 +420,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "brain_plan":
         result = await brainPost("/brain/plan", {
           task: args.task,
+        });
+        break;
+
+      // Phase 2 — Dual-Brain Learning Tools
+      case "brain_warnings":
+        result = await brainPost("/brain/warnings", {
+          query: args.query,
+        });
+        break;
+
+      case "brain_rules":
+        result = await brainPost("/brain/rules", {
+          context: args.context ?? null,
+        });
+        break;
+
+      case "brain_learn_decision":
+        result = await brainPost("/brain/learn_decision", {
+          topic: args.topic,
+          choice: args.choice,
+          reasoning: args.reasoning,
+          alternatives: args.alternatives ?? [],
+          confidence: args.confidence ?? 0.8,
+        });
+        break;
+
+      case "brain_learn_pattern":
+        result = await brainPost("/brain/learn_pattern", {
+          observation: args.observation,
+          pattern_type: args.pattern_type ?? "general",
+          confidence: args.confidence ?? 0.7,
+        });
+        break;
+
+      case "brain_learn_mistake":
+        result = await brainPost("/brain/learn_mistake", {
+          title: args.title,
+          description: args.description,
+          severity: args.severity ?? "medium",
         });
         break;
 

@@ -84,6 +84,15 @@ pub const ALL_CIRCUITS: &[&str] = &[
     "cluster_health_check",
     // Phase Omega VIII — Economic Autonomy
     "economic_audit",
+    // Dual-Brain Phase 3 — Cross-Session Continuity
+    "session_summarizer",
+    // Dual-Brain Phase 4 — Context Quality
+    "context_quality_optimizer",
+    // Dual-Brain Phase 5 — Anticipatory Loading
+    "anticipatory_preloader",
+    // Dual-Brain Phase 6 — Dream Mode
+    "deep_synthesis",
+    "morning_briefing",
 ];
 
 /// How many recent circuits to remember (and avoid repeating).
@@ -231,6 +240,11 @@ async fn run_circuit(db: &Arc<BrainDb>, name: &str) -> Result<String, BrainError
         "cluster_health_check"      => circuit_cluster_health_check(db).await,
         // Phase Omega VIII — Economic Autonomy
         "economic_audit"            => crate::economics::circuit_economic_audit(db).await,
+        "session_summarizer"        => crate::session_continuity::circuit_session_summarizer(db).await,
+        "context_quality_optimizer" => crate::context_quality::circuit_context_quality_optimizer(db).await,
+        "anticipatory_preloader"    => crate::anticipatory::circuit_anticipatory_preloader(db).await,
+        "deep_synthesis"            => crate::dream_mode::circuit_deep_synthesis(db).await,
+        "morning_briefing"          => crate::dream_mode::circuit_morning_briefing(db).await,
         other => Err(BrainError::Internal(format!("Unknown circuit: {}", other))),
     }
 }

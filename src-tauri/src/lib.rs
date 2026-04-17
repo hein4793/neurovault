@@ -16,6 +16,7 @@ pub fn truncate_str(s: &str, max_bytes: usize) -> &str {
 
 mod ai;
 mod analysis;
+mod anticipatory;
 mod attention;
 mod autonomy;
 mod backup;
@@ -32,7 +33,10 @@ mod distributed;
 mod edge_cache;
 mod curiosity_v2;
 mod config;
+mod context_bundle;
+mod context_quality;
 mod db;
+mod dream_mode;
 mod decision_simulator;
 mod economics;
 mod embeddings;
@@ -51,6 +55,7 @@ mod mcp;
 mod memory_tier;
 mod quality;
 mod self_model;
+mod session_continuity;
 mod sidekick;
 mod sidekick_suggestions;
 mod swarm;

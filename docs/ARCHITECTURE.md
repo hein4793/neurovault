@@ -144,6 +144,16 @@ Circuits are NeuroVault's autonomous self-improvement engine. One circuit runs e
 |---------|---------|
 | `economic_audit` | Track value generated vs. compute costs |
 
+#### Dual-Brain Intelligence (5 circuits)
+
+| Circuit | Purpose |
+|---------|---------|
+| `session_summarizer` | Extract structured intelligence from completed Claude Code sessions and write handoff files |
+| `context_quality_optimizer` | Analyze 7-day context bundle performance, detect knowledge gaps, spawn research missions |
+| `anticipatory_preloader` | Predict next tasks (project/time/missions) and pre-build context bundles |
+| `deep_synthesis` | 5-pass overnight reasoning on the day's top nodes (gated to 22:00-06:00) |
+| `morning_briefing` | Compile overnight circuit results and new discoveries into a morning report (gated to 05:00-08:00) |
+
 ---
 
 ## Data Flow
