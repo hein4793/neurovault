@@ -42,9 +42,21 @@ Add to your AI assistant's MCP configuration:
 | `brain_simulate` | Simulate a decision |
 | `brain_dialogue` | Run internal debate on a topic |
 
-### 4. Usage Examples
+### 4. Dual-Brain Learning Tools (v0.2.0)
+
+| Tool | Description |
+|------|-------------|
+| `brain_warnings` | Query past mistakes, bugs, gotchas |
+| `brain_rules` | Query compiled deterministic rules |
+| `brain_learn_decision` | Record a decision with reasoning |
+| `brain_learn_pattern` | Record a behavioral pattern |
+| `brain_learn_mistake` | Record a mistake/warning |
+
+### 5. Usage Examples
 
 Ask your AI assistant:
 - "Check my brain for any knowledge about React server components"
 - "What decisions have I made about database architecture?"
 - "Learn this: we chose SQLite over PostgreSQL for embedded use"
+- "Any warnings about Stripe webhook handling?"
+- "Remember that we prefer explicit error types over Box<dyn Error>"

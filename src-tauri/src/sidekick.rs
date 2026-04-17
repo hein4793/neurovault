@@ -36,13 +36,10 @@
 //! - **Skips itself.** Doesn't process the brain's own session if the
 //!   user happens to have it open (would cause feedback noise).
 
+use crate::context_bundle::{build_context_bundle, render_sidekick_context};
 use crate::db::BrainDb;
-use crate::db::models::{SearchResult, UserCognition};
-use crate::error::BrainError;
 use notify::{Config, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use rusqlite::params;
 use serde_json::Value;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -197,36 +194,48 @@ async fn inject_once(
 
     log::debug!("Sidekick: query='{}'", query);
 
-    // 4) Pull relevant context: vector search + top preferences
-    let matches = run_recall(db, &query, 8).await;
-    let prefs = top_preferences(db, 8).await;
-
-    // 5) Render markdown and write to active-context.md
+    // 4) Build the 6-layer context bundle (rules, knowledge, patterns,
+    //    decisions, warnings, predictions — all MMR-selected and compressed)
     let project_name = session
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|s| s.to_str())
         .unwrap_or("unknown")
         .to_string();
-    let session_name = session
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("session")
-        .to_string();
 
-    let md = render_context(&project_name, &session_name, &query, &matches, &prefs);
+    let bundle = build_context_bundle(db, &query, &project_name).await;
+
+    // 5) Render to structured markdown and write
+    let md = render_sidekick_context(&bundle);
     let path = db.config.active_context_path();
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    std::fs::write(&path, md).map_err(|e| format!("write {}: {}", path.display(), e))?;
+    std::fs::write(&path, &md).map_err(|e| format!("write {}: {}", path.display(), e))?;
 
     log::info!(
-        "Sidekick: wrote context for project '{}' ({} matches, {} prefs)",
+        "Sidekick: wrote 6-layer context for '{}' ({} rules, {} nodes, {} patterns, {} decisions, {} warnings, {} predictions — {}ms, ~{} chars)",
         project_name,
-        matches.len(),
-        prefs.len()
+        bundle.compiled_rules.len(),
+        bundle.knowledge_nodes.len(),
+        bundle.work_patterns.len(),
+        bundle.decisions.len(),
+        bundle.warnings.len(),
+        bundle.predictions.len(),
+        bundle.generation_ms,
+        bundle.total_chars,
     );
+
+    // Phase 4: Log bundle quality for the optimizer circuit
+    let _ = crate::context_quality::log_bundle_quality(
+        db, &project_name, &query,
+        bundle.compiled_rules.len(),
+        bundle.knowledge_nodes.len(),
+        bundle.work_patterns.len(),
+        bundle.generation_ms,
+        bundle.total_chars,
+    ).await;
+
     Ok(())
 }
 
@@ -386,138 +395,9 @@ fn extract_context_query(turns: &[Turn]) -> String {
     query
 }
 
-// =========================================================================
-// Brain queries
-// =========================================================================
-
-async fn run_recall(db: &BrainDb, query: &str, limit: usize) -> Vec<SearchResult> {
-    // Use the embedding pipeline if Ollama is up; fall back to text search
-    let client = crate::embeddings::OllamaClient::new(
-        db.config.ollama_url.clone(),
-        db.config.embedding_model.clone(),
-    );
-    if client.health_check().await {
-        if let Ok(emb) = client.generate_embedding(query).await {
-            let results = db.vector_search(emb, limit).await.unwrap_or_default();
-            if !results.is_empty() {
-                return results;
-            }
-        }
-    }
-    db.search_nodes(query).await.unwrap_or_default()
-}
-
-async fn top_preferences(db: &BrainDb, limit: usize) -> Vec<UserCognition> {
-    let lim = limit;
-    let mut rules: Vec<UserCognition> = db.with_conn(move |conn| -> Result<Vec<UserCognition>, BrainError> {
-        let mut stmt = conn.prepare(
-            "SELECT id, timestamp, trigger_node_ids, pattern_type, extracted_rule, \
-             structured_rule, confidence, times_confirmed, times_contradicted, \
-             embedding, linked_to_nodes \
-             FROM user_cognition LIMIT ?1"
-        ).map_err(|e| BrainError::Database(e.to_string()))?;
-        let rows = stmt.query_map(params![lim as u32 * 10], |row| {
-            Ok(UserCognition {
-                id: row.get(0)?,
-                timestamp: row.get(1)?,
-                trigger_node_ids: serde_json::from_str(&row.get::<_, String>(2)?).unwrap_or_default(),
-                pattern_type: row.get(3)?,
-                extracted_rule: row.get(4)?,
-                structured_rule: row.get(5)?,
-                confidence: row.get(6)?,
-                times_confirmed: row.get(7)?,
-                times_contradicted: row.get(8)?,
-                embedding: None,
-                linked_to_nodes: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
-            })
-        }).map_err(|e| BrainError::Database(e.to_string()))?;
-        let mut result = Vec::new();
-        for r in rows { if let Ok(n) = r { result.push(n); } }
-        Ok(result)
-    }).await.unwrap_or_default();
-
-    rules.sort_by(|a, b| {
-        let sa = a.confidence * (a.times_confirmed as f32 + 1.0);
-        let sb = b.confidence * (b.times_confirmed as f32 + 1.0);
-        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-    });
-    rules.truncate(limit);
-    rules
-}
-
-// =========================================================================
-// Markdown rendering
-// =========================================================================
-
-fn render_context(
-    project: &str,
-    session: &str,
-    query: &str,
-    matches: &[SearchResult],
-    prefs: &[UserCognition],
-) -> String {
-    let now = chrono::Utc::now().to_rfc3339();
-    let mut md = String::new();
-    md.push_str("# Active Context — NeuroVault\n\n");
-    md.push_str("> Auto-written by the brain's proactive sidekick. ");
-    md.push_str("Reflects what the brain knows about your *current* Claude Code session. ");
-    md.push_str("Refreshed every 30 seconds.\n\n");
-    md.push_str(&format!("**Project:** `{}`\n", project));
-    md.push_str(&format!("**Session:** `{}`\n", session));
-    md.push_str(&format!("**Updated:** {}\n", now));
-    md.push_str(&format!("**Query basis:** {}\n\n", short(query, 200)));
-
-    md.push_str("## Relevant knowledge from your brain\n\n");
-    if matches.is_empty() {
-        md.push_str("_No matches found. The brain is still warming up or this is uncharted territory._\n\n");
-    } else {
-        // Dedupe by title since semantic search can return near-duplicates.
-        let mut seen: HashSet<String> = HashSet::new();
-        for m in matches {
-            if !seen.insert(m.node.title.clone()) {
-                continue;
-            }
-            md.push_str(&format!(
-                "- **[{}]** _{}_ — {} _(score {:.2})_\n",
-                m.node.domain,
-                m.node.title,
-                short(&m.node.summary, 220),
-                m.score
-            ));
-        }
-        md.push('\n');
-    }
-
-    md.push_str("## Your established patterns (from user_cognition)\n\n");
-    if prefs.is_empty() {
-        md.push_str("_The brain hasn't extracted any behavioral patterns yet. The user_pattern_mining circuit will fill this in over time._\n\n");
-    } else {
-        for p in prefs {
-            md.push_str(&format!(
-                "- **{}** ({:.0}% confidence, confirmed x{}): {}\n",
-                p.pattern_type,
-                p.confidence * 100.0,
-                p.times_confirmed,
-                short(&p.extracted_rule, 240)
-            ));
-        }
-        md.push('\n');
-    }
-
-    md.push_str("---\n\n");
-    md.push_str("_The brain compounds. Every conversation makes the next one smarter._\n");
-    md
-}
-
-fn short(s: &str, max: usize) -> String {
-    let s = s.trim().replace('\n', " ");
-    if s.chars().count() <= max {
-        s
-    } else {
-        let truncated: String = s.chars().take(max).collect();
-        format!("{}...", truncated)
-    }
-}
+// Old render_context / run_recall / top_preferences removed — replaced by
+// context_bundle::build_context_bundle + render_sidekick_context (Phase 1
+// of the Dual-Brain plan).
 
 // =========================================================================
 // Public re-exports — allow sidekick_suggestions to reuse these helpers

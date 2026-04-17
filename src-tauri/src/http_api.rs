@@ -2,6 +2,7 @@
 
 use crate::db::models::{SearchResult, UserCognition};
 use crate::db::BrainDb;
+use sha2::Digest;
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::{get, post}, Json, Router};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -79,6 +80,14 @@ pub async fn run_http_server(db: Arc<BrainDb>) {
         .route("/economics/cost", post(handle_economics_cost))
         .route("/economics/report", get(handle_economics_report))
         .route("/economics/sustaining", get(handle_economics_sustaining))
+        // Dual-Brain — Context Bundle + Learning Tools (Phase 1 + 2)
+        .route("/brain/bundle", post(handle_context_bundle))
+        .route("/brain/warnings", post(handle_brain_warnings))
+        .route("/brain/rules", post(handle_brain_rules))
+        .route("/brain/learn_decision", post(handle_learn_decision))
+        .route("/brain/learn_pattern", post(handle_learn_pattern))
+        .route("/brain/learn_mistake", post(handle_learn_mistake))
+        .route("/brain/session_handoff", get(handle_session_handoff))
         .layer(cors).with_state(state);
 
     log::info!("HTTP API: binding to http://{}", addr);
@@ -985,5 +994,255 @@ async fn handle_economics_sustaining(
     match crate::economics::is_self_sustaining(&state.db).await {
         Ok(sustaining) => Json(serde_json::json!({ "self_sustaining": sustaining })).into_response(),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// =========================================================================
+// Dual-Brain — Context Bundle endpoint
+// =========================================================================
+
+#[derive(Deserialize)]
+struct BundleReq { query: String, project: Option<String> }
+
+async fn handle_context_bundle(
+    State(state): State<AppState>,
+    Json(req): Json<BundleReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_bundle", &req.query).await;
+    let project = req.project.unwrap_or_else(|| "unknown".to_string());
+    let bundle = crate::context_bundle::build_context_bundle(&state.db, &req.query, &project).await;
+    let md = crate::context_bundle::render_sidekick_context(&bundle);
+    Json(serde_json::json!({
+        "markdown": md,
+        "stats": {
+            "rules": bundle.compiled_rules.len(),
+            "knowledge_nodes": bundle.knowledge_nodes.len(),
+            "work_patterns": bundle.work_patterns.len(),
+            "decisions": bundle.decisions.len(),
+            "warnings": bundle.warnings.len(),
+            "predictions": bundle.predictions.len(),
+            "total_chars": bundle.total_chars,
+            "generation_ms": bundle.generation_ms,
+        }
+    })).into_response()
+}
+
+// =========================================================================
+// Phase 2 — Brain Learning Tools
+// =========================================================================
+
+#[derive(Deserialize)]
+struct WarningsReq { query: String }
+
+async fn handle_brain_warnings(
+    State(state): State<AppState>,
+    Json(req): Json<WarningsReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_warnings", &req.query).await;
+    let q = req.query;
+    let results: Vec<serde_json::Value> = state.db.with_conn(move |conn| {
+        let mut stmt = conn.prepare(
+            "SELECT title, summary, content, tags, quality_score FROM nodes
+             WHERE (node_type = 'contradiction' OR cognitive_type = 'contradiction'
+                    OR tags LIKE '%warning%' OR tags LIKE '%mistake%'
+                    OR tags LIKE '%gotcha%' OR tags LIKE '%bug%')
+             AND (title LIKE '%' || ?1 || '%' OR content LIKE '%' || ?1 || '%')
+             ORDER BY quality_score DESC LIMIT 10"
+        ).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        let search = q.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+        let rows = stmt.query_map(params![search], |row| {
+            Ok(serde_json::json!({
+                "title": row.get::<_, String>(0)?,
+                "summary": row.get::<_, String>(1)?,
+                "content": crate::truncate_str(&row.get::<_, String>(2)?, 500),
+                "tags": row.get::<_, String>(3)?,
+                "quality": row.get::<_, f32>(4)?,
+            }))
+        }).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        let mut result = Vec::new();
+        for r in rows { if let Ok(v) = r { result.push(v); } }
+        Ok(result)
+    }).await.unwrap_or_default();
+    Json(serde_json::json!({ "warnings": results, "count": results.len() })).into_response()
+}
+
+#[derive(Deserialize)]
+struct RulesReq { context: Option<String> }
+
+async fn handle_brain_rules(
+    State(state): State<AppState>,
+    Json(req): Json<RulesReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_rules", req.context.as_deref().unwrap_or("")).await;
+    let rules: Vec<serde_json::Value> = state.db.with_conn(|conn| {
+        let mut stmt = conn.prepare(
+            "SELECT rule_type, condition, action, confidence, times_applied, accuracy
+             FROM knowledge_rules WHERE invalidated = 0
+             ORDER BY confidence DESC LIMIT 50"
+        ).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        let rows = stmt.query_map([], |row| {
+            Ok(serde_json::json!({
+                "rule_type": row.get::<_, String>(0)?,
+                "condition": row.get::<_, String>(1)?,
+                "action": row.get::<_, String>(2)?,
+                "confidence": row.get::<_, f32>(3)?,
+                "times_applied": row.get::<_, u32>(4)?,
+                "accuracy": row.get::<_, f32>(5)?,
+            }))
+        }).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        let mut result = Vec::new();
+        for r in rows { if let Ok(v) = r { result.push(v); } }
+        Ok(result)
+    }).await.unwrap_or_default();
+
+    // If context provided, filter to matching rules
+    let filtered = if let Some(ctx) = &req.context {
+        let ctx_lower = ctx.to_lowercase();
+        let ctx_words: std::collections::HashSet<String> = ctx_lower
+            .split_whitespace().filter(|w| w.len() > 2)
+            .map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|s| !s.is_empty()).collect();
+        rules.into_iter().filter(|r| {
+            let cond = r["condition"].as_str().unwrap_or("").to_lowercase();
+            let cond_words: std::collections::HashSet<String> = cond
+                .split(|c: char| !c.is_alphanumeric() && c != '_')
+                .filter(|w| w.len() > 2).map(|s| s.to_string()).collect();
+            ctx_words.intersection(&cond_words).count() >= 2
+        }).collect()
+    } else {
+        rules
+    };
+
+    Json(serde_json::json!({ "rules": filtered, "count": filtered.len() })).into_response()
+}
+
+#[derive(Deserialize)]
+struct LearnDecisionReq {
+    topic: String,
+    choice: String,
+    reasoning: String,
+    alternatives: Option<Vec<String>>,
+    confidence: Option<f32>,
+}
+
+async fn handle_learn_decision(
+    State(state): State<AppState>,
+    Json(req): Json<LearnDecisionReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_learn_decision", &req.topic).await;
+    let now = chrono::Utc::now().to_rfc3339();
+    let node_id = format!("node:{}", uuid::Uuid::now_v7());
+    let alts = req.alternatives.unwrap_or_default().join(", ");
+    let content = format!(
+        "Decision: {}\n\nChose: {}\nAlternatives considered: {}\n\nReasoning: {}",
+        req.topic, req.choice, alts, req.reasoning
+    );
+    let conf = req.confidence.unwrap_or(0.8);
+    let tags = serde_json::to_string(&vec!["decision", "manual", "claude-learned"]).unwrap_or_default();
+    let nid = node_id.clone();
+    let content_hash = format!("{:x}", sha2::Sha256::digest(content.as_bytes()));
+    let res = state.db.with_conn(move |conn| {
+        conn.execute(
+            "INSERT INTO nodes (id, title, content, summary, content_hash, domain, topic, tags,
+                                node_type, source_type, quality_score, visual_size,
+                                decay_score, access_count, synthesized_by_brain, cognitive_type,
+                                confidence, created_at, updated_at, accessed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'technology', ?6, ?7, 'decision', 'mcp_learn', ?8, 3.0, 1.0, 0, 0, 'decision', ?8, ?9, ?9, ?9)",
+            params![nid, format!("Decision: {}", req.topic), content,
+                    format!("Chose {} over {}", req.choice, alts),
+                    content_hash,
+                    req.topic.to_lowercase().replace(' ', "-"), tags, conf, now],
+        ).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        Ok(())
+    }).await;
+    match res {
+        Ok(()) => Json(serde_json::json!({ "stored": true, "node_id": node_id })).into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct LearnPatternReq {
+    observation: String,
+    pattern_type: Option<String>,
+    confidence: Option<f32>,
+}
+
+async fn handle_learn_pattern(
+    State(state): State<AppState>,
+    Json(req): Json<LearnPatternReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_learn_pattern", &req.observation).await;
+    let now = chrono::Utc::now().to_rfc3339();
+    let id = format!("uc:{}", uuid::Uuid::now_v7());
+    let ptype = req.pattern_type.unwrap_or_else(|| "general".to_string());
+    let conf = req.confidence.unwrap_or(0.7);
+    let rid = id.clone();
+    let pt_clone = ptype.clone();
+    let res = state.db.with_conn(move |conn| {
+        conn.execute(
+            "INSERT INTO user_cognition (id, timestamp, trigger_node_ids, pattern_type,
+                                         extracted_rule, structured_rule, confidence,
+                                         times_confirmed, times_contradicted, linked_to_nodes)
+             VALUES (?1, ?2, '[]', ?3, ?4, NULL, ?5, 1, 0, '[]')",
+            params![rid, now, pt_clone, req.observation, conf],
+        ).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        Ok(())
+    }).await;
+    match res {
+        Ok(()) => Json(serde_json::json!({ "stored": true, "cognition_id": id, "pattern_type": ptype })).into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct LearnMistakeReq {
+    title: String,
+    description: String,
+    severity: Option<String>,
+}
+
+async fn handle_learn_mistake(
+    State(state): State<AppState>,
+    Json(req): Json<LearnMistakeReq>,
+) -> impl IntoResponse {
+    let _ = log_call(&state.db, "brain_learn_mistake", &req.title).await;
+    let now = chrono::Utc::now().to_rfc3339();
+    let node_id = format!("node:{}", uuid::Uuid::now_v7());
+    let sev = req.severity.unwrap_or_else(|| "medium".to_string());
+    let tags = serde_json::to_string(&vec!["warning", "mistake", "claude-learned", &sev]).unwrap_or_default();
+    let nid = node_id.clone();
+    let sev_clone = sev.clone();
+    let title_clone = req.title.clone();
+    let content_hash = format!("{:x}", sha2::Sha256::digest(req.description.as_bytes()));
+    let res = state.db.with_conn(move |conn| {
+        conn.execute(
+            "INSERT INTO nodes (id, title, content, summary, content_hash, domain, topic, tags,
+                                node_type, source_type, quality_score, visual_size,
+                                decay_score, access_count, synthesized_by_brain, cognitive_type,
+                                created_at, updated_at, accessed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, 'technology', 'warnings', ?6, 'contradiction', 'mcp_learn', 0.9, 4.0, 1.0, 0, 0, 'contradiction', ?7, ?7, ?7)",
+            params![nid, format!("Warning: {}", title_clone), req.description,
+                    format!("[{}] {}", sev_clone.to_uppercase(), title_clone), content_hash, tags, now],
+        ).map_err(|e| crate::error::BrainError::Database(e.to_string()))?;
+        Ok(())
+    }).await;
+    match res {
+        Ok(()) => Json(serde_json::json!({ "stored": true, "node_id": node_id, "severity": sev })).into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+// =========================================================================
+// Phase 3 — Session Handoff
+// =========================================================================
+
+async fn handle_session_handoff(
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    let path = state.db.config.export_dir().join("session-handoff.md");
+    match std::fs::read_to_string(&path) {
+        Ok(content) => Json(serde_json::json!({ "handoff": content })).into_response(),
+        Err(_) => Json(serde_json::json!({ "handoff": null, "message": "No session handoff available yet. The session_summarizer circuit creates this after a completed session." })).into_response(),
     }
 }

@@ -1,11 +1,11 @@
 # Circuit Catalog
 
-Complete reference for NeuroVault's **31 autonomous circuits**. One fires every 20 minutes on a rotation that skips the last 3 to run.
+Complete reference for NeuroVault's **36 autonomous circuits**. One fires every 20 minutes on a rotation that skips the last 3 to run.
 
 > Looking to write a new circuit? See [CIRCUIT_GUIDE.md](CIRCUIT_GUIDE.md).
 > This document is the reader's reference: what each circuit does, what it reads, what it writes, and how to tell when one is misbehaving.
 
-**Rotation:** 20 min/cycle → 72 cycles/day → each circuit runs ~2.3×/day
+**Rotation:** 20 min/cycle → each circuit runs ~2×/day
 **Source of truth:** `ALL_CIRCUITS` array in `src-tauri/src/circuits.rs`
 
 ---
@@ -45,6 +45,11 @@ Complete reference for NeuroVault's **31 autonomous circuits**. One fires every 
 | 29 | `federation_sync` | Ω VI | · | · |
 | 30 | `cluster_health_check` | Ω VII | · | · |
 | 31 | `economic_audit` | Ω VIII | · | ✓ |
+| 32 | `session_summarizer` | DB | · | ✓ |
+| 33 | `context_quality_optimizer` | DB | · | · |
+| 34 | `anticipatory_preloader` | DB | ✓ | · |
+| 35 | `deep_synthesis` | DB | · | ✓ |
+| 36 | `morning_briefing` | DB | · | · |
 
 ---
 
@@ -260,6 +265,41 @@ Complete reference for NeuroVault's **31 autonomous circuits**. One fires every 
 **Purpose:** Attribute tangible value (time saved, decisions supported) against compute cost.
 **Reads:** `mcp_call_log`, `nodes` (value-attributed), `autonomy_circuit_log`.
 **Writes:** `economics_ledger` rows; `/economics/report` reflects latest.
+
+---
+
+## Dual-Brain Intelligence Circuits
+
+### 32. `session_summarizer`
+**Purpose:** Extract structured intelligence from completed Claude Code sessions. Creates `session_summary` nodes with decisions, code written, problems solved, open questions, and next steps. Writes `~/.neurovault/export/session-handoff.md` for seamless cross-session continuity.
+**Reads:** `~/.claude/projects/` — `.jsonl` session files not modified in >10 minutes.
+**Writes:** `session_summary` nodes; `session-handoff.md` export file.
+**Notes:** Only processes sessions that appear completed (no recent modification). Skips already-summarized sessions. Uses FAST LLM for extraction.
+
+### 33. `context_quality_optimizer`
+**Purpose:** Analyze how effective the sidekick's context bundles are over the past 7 days. If average knowledge nodes per bundle is too low, creates research missions to fill detected knowledge gaps.
+**Reads:** `context_quality_log` table (populated by the sidekick on every inject cycle); `knowledge_gaps` table.
+**Writes:** Updates to `knowledge_gaps`; new `research_missions` for high-priority gaps.
+**Typical cadence:** Weekly (but will fire whenever the rotation selects it).
+
+### 34. `anticipatory_preloader`
+**Purpose:** Predict what context the user will need next and pre-build context bundles. Uses three prediction strategies: recently active topics, time-of-day patterns (morning/afternoon/evening), and pending research missions.
+**Reads:** Recent `nodes.accessed_at`, `research_missions`, system clock.
+**Writes:** `~/.neurovault/export/anticipatory-context.md` with pre-rendered context bundles.
+**Notes:** Pre-builds up to 2 context bundles per cycle.
+
+### 35. `deep_synthesis`
+**Purpose:** 5-pass overnight reasoning on the day's top nodes. Identifies core themes, cross-topic connections, novel insights, predictions, and the single most important takeaway.
+**Reads:** Top 10 high-quality nodes created in the past 18 hours.
+**Writes:** `insight` node in `synthesis` domain with tags `dream`, `overnight`.
+**Time gate:** Only runs between 22:00 and 06:00 local time. Skips silently outside this window.
+**Notes:** Uses DEEP LLM (Qwen 32B) for multi-pass reasoning.
+
+### 36. `morning_briefing`
+**Purpose:** Compile overnight circuit results and new brain-generated nodes into a morning briefing before the user starts work.
+**Reads:** `autonomy_circuit_log` (past 10 hours); `nodes` created overnight with `synthesized_by_brain=1`.
+**Writes:** `~/.neurovault/export/morning-briefing.md`; `insight` node in `meta` domain.
+**Time gate:** Only runs between 05:00 and 08:00 local time. Only once per day (deduplicates by date).
 
 ---
 
