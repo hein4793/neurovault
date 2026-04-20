@@ -60,3 +60,6 @@ src-tauri/gen/
 # Local cargo config (may contain machine-specific paths)
 src-tauri/.cargo/
 .cargo/config.toml
+
+# Claude Code local settings (may contain absolute user paths)
+.claude/
