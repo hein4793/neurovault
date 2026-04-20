@@ -82,6 +82,7 @@ pub struct PatternEntry {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DecisionEntry {
     pub title: String,
     pub summary: String,

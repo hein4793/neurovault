@@ -1087,6 +1087,7 @@ async fn ingest_docx(
 }
 
 /// Supported text extensions for ingestion
+#[allow(dead_code)]
 const TEXT_EXTENSIONS: &[&str] = &[
     "md", "txt", "rs", "ts", "tsx", "js", "jsx", "py", "json", "toml",
     "yaml", "yml", "css", "html", "go", "java", "c", "cpp", "h", "hpp",

@@ -133,6 +133,7 @@ pub async fn register_node(
 }
 
 /// Update a node's heartbeat timestamp.
+#[allow(dead_code)]
 pub async fn heartbeat(db: &Arc<BrainDb>, node_id: String) -> Result<(), BrainError> {
     let now = chrono::Utc::now().to_rfc3339();
     db.with_conn(move |conn| {
@@ -164,6 +165,7 @@ pub async fn check_nodes_health(db: &Arc<BrainDb>) -> Result<u64, BrainError> {
 }
 
 /// Push new/updated nodes to a remote brain node via HTTP POST.
+#[allow(dead_code)]
 pub async fn sync_to_node(db: &Arc<BrainDb>, node_id: String) -> Result<SyncStatus, BrainError> {
     // 1. Look up the target node's endpoint
     let nid = node_id.clone();
@@ -276,6 +278,7 @@ pub async fn sync_to_node(db: &Arc<BrainDb>, node_id: String) -> Result<SyncStat
 }
 
 /// Pull new nodes from a remote brain node.
+#[allow(dead_code)]
 pub async fn sync_from_node(
     db: &Arc<BrainDb>,
     node_id: String,
@@ -496,6 +499,7 @@ pub async fn get_cluster_status(db: &Arc<BrainDb>) -> Result<ClusterStatus, Brai
 /// Check if a query should be routed to a specialized node based on
 /// node capabilities. Returns the endpoint URL if routing is appropriate,
 /// or None if the query should be handled locally.
+#[allow(dead_code)]
 pub async fn route_query(
     db: &Arc<BrainDb>,
     query: String,

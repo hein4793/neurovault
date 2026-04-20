@@ -41,6 +41,7 @@ pub struct DataStream {
     pub created_at: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamEvent {
     pub id: String,

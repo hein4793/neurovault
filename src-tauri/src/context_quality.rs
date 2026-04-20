@@ -63,6 +63,7 @@ pub async fn log_bundle_quality(
 // Knowledge gap detection
 // =========================================================================
 
+#[allow(dead_code)]
 pub async fn log_knowledge_gap(
     db: &BrainDb,
     query: &str,

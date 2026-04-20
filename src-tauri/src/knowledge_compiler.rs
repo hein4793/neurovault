@@ -198,6 +198,7 @@ pub async fn compile_rules(db: &Arc<BrainDb>) -> Result<String, BrainError> {
 // apply_rule — match compiled rules against a context string
 // =========================================================================
 
+#[allow(dead_code)]
 pub async fn apply_rule(db: &Arc<BrainDb>, context: &str) -> Result<Vec<KnowledgeRule>, BrainError> {
     let all_rules: Vec<KnowledgeRule> = db
         .with_conn(|conn| {

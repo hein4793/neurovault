@@ -154,6 +154,7 @@ pub async fn inventory_capabilities(db: &Arc<BrainDb>) -> Result<Vec<Capability>
 // test_capability — generate a test question for a domain, self-evaluate
 // =========================================================================
 
+#[allow(dead_code)]
 pub async fn test_capability(db: &Arc<BrainDb>, name: &str) -> Result<Capability, BrainError> {
     // Fetch some nodes from this domain for context
     let cap_name = name.to_string();
