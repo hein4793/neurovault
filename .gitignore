@@ -15,10 +15,10 @@ dist/
 *.bin
 *.parquet
 *.jsonl
-data/
-vault/
-export/
-backups/
+/data/
+/vault/
+/export/
+/backups/
 compaction/
 cold/
 cold_storage/
