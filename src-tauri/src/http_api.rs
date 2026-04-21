@@ -21,6 +21,7 @@ pub async fn run_http_server(db: Arc<BrainDb>) {
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
         .route("/metrics/power", get(handle_metrics_power))
+        .route("/metrics/power/status", get(handle_metrics_power_status))
         .route("/brain/recall", post(handle_recall))
         .route("/brain/context", post(handle_context))
         .route("/brain/preferences", post(handle_preferences))
@@ -122,6 +123,14 @@ async fn handle_metrics_power(
         Ok(summary) => Json(serde_json::to_value(&summary).unwrap_or(serde_json::Value::Null)).into_response(),
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
+}
+
+/// Live policy snapshot — current PowerMode, whether CPU routing is
+/// active, backend wattage coefficients. Used by the dashboard to
+/// show what the brain is actually doing right now.
+async fn handle_metrics_power_status(State(state): State<AppState>) -> impl IntoResponse {
+    let status = crate::power_telemetry::power_status(&state.db);
+    Json(serde_json::to_value(&status).unwrap_or(serde_json::Value::Null)).into_response()
 }
 
 #[derive(Deserialize)] struct RecallReq { query: String, limit: Option<usize> }

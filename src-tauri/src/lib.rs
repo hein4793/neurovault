@@ -94,6 +94,7 @@ mod circuit_performance;
 mod circuits;
 mod cognitive_fingerprint;
 mod power_telemetry;
+mod power_policy;
 mod cold_storage;
 mod cold_storage_parquet;
 mod commands;
@@ -157,6 +158,10 @@ pub async fn headless_main() -> Result<(), String> {
     let brain_db = BrainDb::init().await.map_err(|e| e.to_string())?;
     let db = std::sync::Arc::new(brain_db);
     power_telemetry::init_telemetry_db(db.clone());
+    {
+        let pdb = db.clone();
+        tokio::spawn(async move { power_policy::run_power_policy_loop(pdb).await });
+    }
 
     log::info!("brain-headless: spawning background tasks via BrainCore...");
     brain_core::BrainCore::start_all(db.clone(), None);
@@ -195,6 +200,14 @@ pub fn run() {
                         // Register the DB with the power-telemetry module so
                         // every LLM inference can record one row into inference_log.
                         power_telemetry::init_telemetry_db(db.clone());
+                        // Start adaptive power-policy loop (Phase 4) so AC/battery
+                        // transitions demote GPU calls to CPU automatically.
+                        {
+                            let pdb = db.clone();
+                            tauri::async_runtime::spawn(async move {
+                                power_policy::run_power_policy_loop(pdb).await;
+                            });
+                        }
                         // Start file watcher for auto-sync
                         sync::start_file_watcher(db.clone());
                         // Start background embedding pipeline

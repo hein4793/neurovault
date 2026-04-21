@@ -45,53 +45,73 @@ pub(crate) fn get_llm_client_cpu_fast(db: &BrainDb) -> LlmClient {
 }
 
 fn get_llm_client_cpu_tier(db: &BrainDb, tier: LlmTier) -> LlmClient {
-    let base = get_llm_client_for(db, tier);
-    match db.config.ollama_cpu_url.as_deref() {
-        Some(cpu_url) => LlmClient::new("ollama", base.model(), cpu_url, None)
-            .with_backend_tag("ollama-cpu"),
-        None => {
-            // No CPU daemon configured — stay on GPU. Telemetry will still
-            // record the call as `ollama-vulkan`; users see no savings
-            // until they start the second daemon and set ollama_cpu_url.
-            log::debug!("CPU LLM client requested but ollama_cpu_url not set — using GPU pool");
-            base
-        }
-    }
+    // Delegate to the unified builder with force_cpu=true so we share the
+    // config / fallback / telemetry logic.
+    build_llm_client_for(db, tier, /* force_cpu */ true)
 }
 
 fn get_llm_client_for(db: &BrainDb, tier: LlmTier) -> LlmClient {
+    build_llm_client_for(db, tier, /* force_cpu */ false)
+}
+
+fn build_llm_client_for(db: &BrainDb, tier: LlmTier, force_cpu: bool) -> LlmClient {
     let settings_path = db.config.data_dir.join("settings.json");
-    let (provider, model, api_key) = if settings_path.exists() {
-        if let Ok(data) = std::fs::read_to_string(&settings_path) {
-            if let Ok(s) = serde_json::from_str::<serde_json::Value>(&data) {
-                let provider = s.get("llm_provider").and_then(|v| v.as_str()).unwrap_or("ollama").to_string();
-                let default_model = s.get("llm_model").and_then(|v| v.as_str()).unwrap_or("qwen2.5-coder:14b").to_string();
-                let model = match tier {
-                    LlmTier::Default => default_model.clone(),
-                    LlmTier::Fast => s.get("llm_model_fast")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(&default_model)
-                        .to_string(),
-                    LlmTier::Deep => s.get("llm_model_deep")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(&default_model)
-                        .to_string(),
-                };
-                let api_key = s.get("anthropic_api_key").and_then(|v| v.as_str()).map(String::from);
-                (provider, model, api_key)
-            } else {
-                ("ollama".to_string(), "qwen2.5-coder:14b".to_string(), None)
-            }
-        } else {
-            ("ollama".to_string(), "qwen2.5-coder:14b".to_string(), None)
-        }
+    let settings: Option<serde_json::Value> = if settings_path.exists() {
+        std::fs::read_to_string(&settings_path)
+            .ok()
+            .and_then(|data| serde_json::from_str(&data).ok())
     } else {
-        let model = match tier {
-            LlmTier::Deep => "qwen2.5-coder:32b",
-            _ => "qwen2.5-coder:14b",
-        }.to_string();
-        ("ollama".to_string(), model, None)
+        None
     };
+
+    let get = |key: &str| -> Option<String> {
+        settings
+            .as_ref()
+            .and_then(|s| s.get(key))
+            .and_then(|v| v.as_str())
+            .map(String::from)
+    };
+
+    let provider = get("llm_provider").unwrap_or_else(|| "ollama".to_string());
+    let default_model = get("llm_model").unwrap_or_else(|| "qwen2.5-coder:14b".to_string());
+    let model = match tier {
+        LlmTier::Default => default_model.clone(),
+        LlmTier::Fast => get("llm_model_fast").unwrap_or_else(|| default_model.clone()),
+        LlmTier::Deep => get("llm_model_deep").unwrap_or_else(|| default_model.clone()),
+    };
+    let api_key = get("anthropic_api_key");
+
+    // Phase 3: profile-based auto-routing. If the current circuit is Batch
+    // (or caller explicitly asked for CPU) and a CPU daemon is configured,
+    // route the call there — costs ~80W instead of ~300W. Falls back to
+    // the GPU daemon when no CPU daemon is set so callers never break.
+    //
+    // Phase 4: adaptive policy can globally promote CPU routing — e.g.
+    // Eco mode (on battery) demotes Interactive calls to CPU as well.
+    let profile = crate::power_telemetry::current_profile();
+    let policy_prefers_cpu = crate::power_policy::prefer_cpu();
+    let should_cpu = force_cpu
+        || policy_prefers_cpu
+        || matches!(profile, crate::power_telemetry::CircuitProfile::Batch);
+
+    if should_cpu {
+        if let Some(cpu_url) = db.config.ollama_cpu_url.as_deref() {
+            // Phase 5: CPU-specific model. A 14B+ model on CPU is ~1-3 tok/s,
+            // defeating the purpose. Pick the user-configured `llm_model_cpu`,
+            // or fall back to the fast-tier model, or a conservative default.
+            let cpu_model = get("llm_model_cpu")
+                .or_else(|| get("llm_model_fast"))
+                .unwrap_or_else(|| "qwen2.5:3b".to_string());
+            log::debug!(
+                "Routing '{}' ({:?}) → ollama-cpu (model={})",
+                crate::power_telemetry::current_circuit(),
+                profile,
+                cpu_model
+            );
+            return LlmClient::new("ollama", &cpu_model, cpu_url, None)
+                .with_backend_tag("ollama-cpu");
+        }
+    }
 
     LlmClient::new(&provider, &model, &db.config.ollama_url, api_key)
 }

@@ -36,6 +36,62 @@ pub fn current_circuit() -> String {
 }
 
 // =========================================================================
+// Circuit profiles (Phase 3)
+// =========================================================================
+
+/// Latency class of a circuit. Routes inference to the backend that fits
+/// its tolerance for wait time.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CircuitProfile {
+    /// User is actively waiting — GPU-first, never downshift.
+    Interactive,
+    /// User may glance at the result but isn't blocked — GPU by default,
+    /// CPU acceptable under load.
+    NearRealTime,
+    /// Pure background work — CPU is the default to save power.
+    Batch,
+}
+
+impl CircuitProfile {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Interactive => "interactive",
+            Self::NearRealTime => "near_real_time",
+            Self::Batch => "batch",
+        }
+    }
+}
+
+/// Look up the profile of a circuit by name. Defaults to `Batch` for any
+/// circuit the table doesn't know about — safest for power: an unknown
+/// circuit probably shouldn't be burning GPU at 300W.
+pub fn circuit_profile(name: &str) -> CircuitProfile {
+    match name {
+        // Interactive — user is blocked waiting
+        "chat_response"
+        | "brain_recall"
+        | "sidekick"
+        | "sidekick_suggestions"
+            => CircuitProfile::Interactive,
+
+        // Near real-time — user may check soon, but no active wait
+        "session_summarizer"
+        | "anticipatory_preloader"
+        | "morning_briefing"
+        | "context_quality_optimizer"
+            => CircuitProfile::NearRealTime,
+
+        // Everything else is batch — see circuits::ALL_CIRCUITS for the full list
+        _ => CircuitProfile::Batch,
+    }
+}
+
+/// Profile for the circuit on whose behalf this task is running.
+pub fn current_profile() -> CircuitProfile {
+    circuit_profile(&current_circuit())
+}
+
+// =========================================================================
 // Energy coefficients
 // =========================================================================
 
@@ -164,7 +220,12 @@ pub struct PowerSummary {
     pub window_hours: i64,
     pub total_calls: u64,
     pub total_energy_wh: f64,
+    /// Average watts while actively generating (duration-weighted).
     pub avg_watts: f64,
+    /// Projected annual energy if the measured window is representative.
+    /// Calculated as `total_energy_wh * (8760 / window_hours) / 1000`.
+    /// Phase 6 — gives users a single "$/year" figure to optimize against.
+    pub annualized_kwh: f64,
     pub by_circuit: Vec<CircuitPower>,
     pub by_backend: Vec<BackendPower>,
 }
@@ -254,16 +315,53 @@ pub async fn rollup_power(db: &Arc<BrainDb>, window_hours: i64) -> Result<PowerS
         let active_seconds = (total_duration_ms as f64 / 1000.0).max(1.0);
         let avg_watts = (total_energy_wh * 3600.0) / active_seconds;
 
+        let annualized_kwh =
+            total_energy_wh * (8760.0 / window_hours.max(1) as f64) / 1000.0;
+
         Ok(PowerSummary {
             window_hours,
             total_calls: total_calls as u64,
             total_energy_wh,
             avg_watts,
+            annualized_kwh,
             by_circuit,
             by_backend,
         })
     })
     .await
+}
+
+// =========================================================================
+// Live policy snapshot (Phase 6)
+// =========================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PowerStatus {
+    /// Currently active PowerMode (normal / eco / ...).
+    pub mode: &'static str,
+    /// Whether the adaptive policy currently wants to demote to CPU.
+    pub prefer_cpu: bool,
+    /// Whether a CPU Ollama daemon is configured at all.
+    pub cpu_daemon_configured: bool,
+    /// AC line detection: `Some(true)` = on battery, `Some(false)` = mains,
+    /// `None` = unknown / unsupported OS.
+    pub on_battery: Option<bool>,
+    /// Active wattage coefficients used by `estimate_energy_wh`.
+    pub backend_watts: std::collections::BTreeMap<String, f64>,
+}
+
+pub fn power_status(db: &BrainDb) -> PowerStatus {
+    let mut backend_watts = std::collections::BTreeMap::new();
+    for b in ["ollama-vulkan", "ollama-gpu", "ollama-rocm", "ollama-cpu", "anthropic-api", "peer-rpc"] {
+        backend_watts.insert(b.to_string(), backend_active_watts(b));
+    }
+    PowerStatus {
+        mode: crate::power_policy::current_mode().as_str(),
+        prefer_cpu: crate::power_policy::prefer_cpu(),
+        cpu_daemon_configured: db.config.ollama_cpu_url.is_some(),
+        on_battery: crate::power_policy::on_battery(),
+        backend_watts,
+    }
 }
 
 #[cfg(test)]
