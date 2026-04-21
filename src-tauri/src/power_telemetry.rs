@@ -62,9 +62,14 @@ impl CircuitProfile {
     }
 }
 
-/// Look up the profile of a circuit by name. Defaults to `Batch` for any
-/// circuit the table doesn't know about — safest for power: an unknown
-/// circuit probably shouldn't be burning GPU at 300W.
+/// Look up the profile of a circuit by name.
+///
+/// Explicitly-scoped batch circuits (those firing through `run_circuit()`)
+/// are matched by name and routed to CPU. Any name not in the table —
+/// including calls made outside a scope, which land as "unknown" — gets
+/// Interactive so ad-hoc / user-initiated calls don't accidentally slow
+/// down on CPU. To keep a circuit on GPU, add it to the Interactive or
+/// NearRealTime arms below.
 pub fn circuit_profile(name: &str) -> CircuitProfile {
     match name {
         // Interactive — user is blocked waiting
@@ -72,6 +77,7 @@ pub fn circuit_profile(name: &str) -> CircuitProfile {
         | "brain_recall"
         | "sidekick"
         | "sidekick_suggestions"
+        | "unknown"
             => CircuitProfile::Interactive,
 
         // Near real-time — user may check soon, but no active wait
@@ -81,8 +87,49 @@ pub fn circuit_profile(name: &str) -> CircuitProfile {
         | "context_quality_optimizer"
             => CircuitProfile::NearRealTime,
 
-        // Everything else is batch — see circuits::ALL_CIRCUITS for the full list
-        _ => CircuitProfile::Batch,
+        // Every *scoped* circuit (i.e. called via run_circuit) that we
+        // don't explicitly list above is a background rotation circuit
+        // and should go to CPU to save power.
+        //
+        // Interactive circuits that fire outside run_circuit() will match
+        // "unknown" above and stay on GPU.
+        "meta_reflection"
+        | "user_pattern_mining"
+        | "cross_domain_fusion"
+        | "quality_recalc"
+        | "self_synthesis"
+        | "curiosity_gap_fill"
+        | "iq_boost"
+        | "compression_cycle"
+        | "contradiction_detector"
+        | "decision_memory_extractor"
+        | "knowledge_synthesizer"
+        | "self_assessment"
+        | "prediction_validator"
+        | "hypothesis_tester"
+        | "code_pattern_extractor"
+        | "synapse_prune"
+        | "fingerprint_synthesis"
+        | "internal_dialogue"
+        | "swarm_orchestrator"
+        | "temporal_analysis"
+        | "causal_model_builder"
+        | "scenario_simulator"
+        | "knowledge_compiler"
+        | "circuit_optimizer"
+        | "capability_tracker"
+        | "self_reflection"
+        | "attention_update"
+        | "curiosity_v2"
+        | "federation_sync"
+        | "cluster_health_check"
+        | "economic_audit"
+        | "deep_synthesis"
+            => CircuitProfile::Batch,
+
+        // Unknown scoped names default to NearRealTime — safer than Batch
+        // when we don't know what they're doing.
+        _ => CircuitProfile::NearRealTime,
     }
 }
 
