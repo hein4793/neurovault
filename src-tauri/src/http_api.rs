@@ -20,6 +20,7 @@ pub async fn run_http_server(db: Arc<BrainDb>) {
     let app = Router::new()
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
+        .route("/metrics/power", get(handle_metrics_power))
         .route("/brain/recall", post(handle_recall))
         .route("/brain/context", post(handle_context))
         .route("/brain/preferences", post(handle_preferences))
@@ -106,6 +107,21 @@ async fn handle_health() -> impl IntoResponse {
 
 async fn handle_stats(State(state): State<AppState>) -> impl IntoResponse {
     match state.db.get_brain_stats().await { Ok(stats) => Json(serde_json::to_value(&stats).unwrap_or(serde_json::Value::Null)).into_response(), Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response() }
+}
+
+/// Power telemetry rollup. Accepts `?hours=N` (default 24, clamped to [1, 720]).
+#[derive(Deserialize)]
+struct PowerQuery { hours: Option<i64> }
+
+async fn handle_metrics_power(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<PowerQuery>,
+) -> impl IntoResponse {
+    let hours = q.hours.unwrap_or(24).clamp(1, 24 * 30);
+    match crate::power_telemetry::rollup_power(&state.db, hours).await {
+        Ok(summary) => Json(serde_json::to_value(&summary).unwrap_or(serde_json::Value::Null)).into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 #[derive(Deserialize)] struct RecallReq { query: String, limit: Option<usize> }

@@ -195,7 +195,15 @@ fn pick_next_circuit(recent: &[String]) -> &'static str {
 // =========================================================================
 
 /// Run the named circuit and return a human-readable result string.
+/// Wraps the dispatch in a task-local scope so every LLM call inside the
+/// circuit automatically tags its power-telemetry row with the circuit name.
 async fn run_circuit(db: &Arc<BrainDb>, name: &str) -> Result<String, BrainError> {
+    crate::power_telemetry::CURRENT_CIRCUIT
+        .scope(name.to_string(), run_circuit_inner(db, name))
+        .await
+}
+
+async fn run_circuit_inner(db: &Arc<BrainDb>, name: &str) -> Result<String, BrainError> {
     match name {
         // Phase 0
         "meta_reflection"     => circuit_meta_reflection(db).await,

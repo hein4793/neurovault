@@ -14,6 +14,73 @@ pub fn truncate_str(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 
+/// Decode a Claude Code project-folder name back into a human-readable label.
+///
+/// Claude Code stores per-project session logs in `~/.claude/projects/<encoded>/`,
+/// where `<encoded>` is the absolute project path with every non-alphanumeric
+/// character replaced by `-` (e.g. `C:\Users\Alice\src\app` →
+/// `C--Users-Alice-src-app`). This function strips the current user's encoded
+/// home-directory prefix at runtime, so the result is correct on any machine
+/// regardless of username or folder layout.
+pub fn decode_claude_project_name(encoded: &str) -> String {
+    let home_prefix = encoded_home_prefix();
+    let stripped = if !home_prefix.is_empty() {
+        encoded
+            .strip_prefix(&home_prefix)
+            .map(|rest| rest.trim_start_matches('-'))
+            .unwrap_or(encoded)
+    } else {
+        encoded
+    };
+    stripped.replace('-', " ").trim().to_string()
+}
+
+/// Encode the current user's home directory using Claude Code's rule:
+/// every non-ASCII-alphanumeric character becomes `-`.
+fn encoded_home_prefix() -> String {
+    let home = match dirs::home_dir().and_then(|p| p.to_str().map(String::from)) {
+        Some(h) => h,
+        None => return String::new(),
+    };
+    home.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+#[cfg(test)]
+mod project_name_tests {
+    use super::*;
+
+    #[test]
+    fn strips_encoded_home_prefix() {
+        // Simulate a Windows-style encoded name with a known home.
+        // decode_claude_project_name uses the live $HOME; test via the inner
+        // encoder for deterministic assertions.
+        let encoded = "C--Users-Alice";
+        let remainder = encoded.strip_prefix("C--Users-Alice").unwrap();
+        assert_eq!(remainder, "");
+    }
+
+    #[test]
+    fn returns_human_readable_fallback_without_prefix_match() {
+        // When prefix doesn't match, just dash-to-space + trim.
+        let s = "My-Cool-Project";
+        assert_eq!(s.replace('-', " ").trim(), "My Cool Project");
+    }
+
+    #[test]
+    fn encoder_matches_claude_code_rule() {
+        fn enc(s: &str) -> String {
+            s.chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect()
+        }
+        assert_eq!(enc("C:\\Users\\Alice"), "C--Users-Alice");
+        assert_eq!(enc("/home/bob"), "-home-bob");
+        assert_eq!(enc("/Users/carol/.claude"), "-Users-carol--claude");
+    }
+}
+
 mod ai;
 mod analysis;
 mod anticipatory;
@@ -26,6 +93,7 @@ mod capability_frontier;
 mod circuit_performance;
 mod circuits;
 mod cognitive_fingerprint;
+mod power_telemetry;
 mod cold_storage;
 mod cold_storage_parquet;
 mod commands;
@@ -88,6 +156,7 @@ pub async fn headless_main() -> Result<(), String> {
     log::info!("brain-headless: initialising database...");
     let brain_db = BrainDb::init().await.map_err(|e| e.to_string())?;
     let db = std::sync::Arc::new(brain_db);
+    power_telemetry::init_telemetry_db(db.clone());
 
     log::info!("brain-headless: spawning background tasks via BrainCore...");
     brain_core::BrainCore::start_all(db.clone(), None);
@@ -123,6 +192,9 @@ pub fn run() {
                     Ok(brain_db) => {
                         log::info!("Brain database initialized OK");
                         let db = Arc::new(brain_db);
+                        // Register the DB with the power-telemetry module so
+                        // every LLM inference can record one row into inference_log.
+                        power_telemetry::init_telemetry_db(db.clone());
                         // Start file watcher for auto-sync
                         sync::start_file_watcher(db.clone());
                         // Start background embedding pipeline

@@ -206,10 +206,8 @@ async fn summarize_session(
         .parent()
         .and_then(|p| p.file_name())
         .and_then(|s| s.to_str())
-        .unwrap_or("unknown")
-        .replace("C--Users-User-OneDrive-Desktop-", "")
-        .replace("C--Users-User-", "")
-        .replace('-', " ");
+        .map(crate::decode_claude_project_name)
+        .unwrap_or_else(|| "unknown".to_string());
 
     let session_id = session_path
         .file_stem()

@@ -529,6 +529,22 @@ impl BrainDb {
             CREATE INDEX IF NOT EXISTS idx_data_streams_enabled ON data_streams(enabled);
             CREATE INDEX IF NOT EXISTS idx_stream_events_stream ON stream_events(stream_id);
             CREATE INDEX IF NOT EXISTS idx_stream_events_hash ON stream_events(content_hash);
+
+            -- Power telemetry (Phase 1 — every LLM inference logs one row here)
+            CREATE TABLE IF NOT EXISTS inference_log (
+                id          TEXT    PRIMARY KEY,
+                circuit     TEXT    NOT NULL DEFAULT 'unknown',
+                backend     TEXT    NOT NULL,
+                model       TEXT    NOT NULL,
+                tokens_in   INTEGER NOT NULL DEFAULT 0,
+                tokens_out  INTEGER NOT NULL DEFAULT 0,
+                duration_ms INTEGER NOT NULL,
+                energy_wh   REAL    NOT NULL,
+                created_at  TEXT    NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_inference_log_created_at ON inference_log(created_at);
+            CREATE INDEX IF NOT EXISTS idx_inference_log_circuit ON inference_log(circuit);
+            CREATE INDEX IF NOT EXISTS idx_inference_log_backend ON inference_log(backend);
             "
         ).map_err(|e| BrainError::Database(format!("Index creation failed: {}", e)))?;
 

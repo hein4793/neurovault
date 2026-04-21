@@ -1,5 +1,7 @@
 use crate::error::BrainError;
+use crate::power_telemetry;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 #[derive(Debug, Serialize)]
 struct OllamaGenerateRequest {
@@ -78,6 +80,36 @@ impl LlmClient {
         }
     }
 
+    /// Backend identifier used in the telemetry log. Derived from the
+    /// provider (and in the future, from the routing decision).
+    fn backend_id(&self) -> &'static str {
+        match self.provider.as_str() {
+            "anthropic" => "anthropic-api",
+            // TODO Phase 2: distinguish ollama-vulkan vs ollama-cpu via
+            // routed backend — for now assume the default GPU pool.
+            _ => "ollama-vulkan",
+        }
+    }
+
+    /// Record a finished inference via the global telemetry accessor.
+    /// No-op when telemetry hasn't been initialized (e.g. unit tests).
+    /// Detached so callers don't pay the DB round-trip in the hot path.
+    fn record_call(&self, duration_ms: u64, prompt_len: usize, response_len: usize) {
+        let backend = self.backend_id().to_string();
+        let model = self.model.clone();
+        // Rough token estimate: ~4 chars per token. Accurate tokenization
+        // would need the model's tokenizer; we accept ~15% error for the
+        // sake of keeping the recorder backend-agnostic.
+        let tokens_in = (prompt_len / 4) as u32;
+        let tokens_out = (response_len / 4) as u32;
+        tokio::spawn(async move {
+            power_telemetry::record_inference_global(
+                &backend, &model, tokens_in, tokens_out, duration_ms,
+            )
+            .await;
+        });
+    }
+
     pub async fn generate(&self, prompt: &str, max_tokens: u32) -> Result<String, BrainError> {
         match self.provider.as_str() {
             "anthropic" => self.generate_anthropic(prompt, max_tokens).await,
@@ -100,6 +132,7 @@ impl LlmClient {
 
         // Retry up to 2 times on 404 (model loading race)
         let mut last_err = String::new();
+        let started = Instant::now();
         for attempt in 0..3 {
             let resp = self.client
                 .post(format!("{}/api/generate", self.ollama_url))
@@ -111,6 +144,11 @@ impl LlmClient {
             if resp.status().is_success() {
                 let data: OllamaGenerateResponse = resp.json().await
                     .map_err(|e| BrainError::Embedding(format!("Failed to parse Ollama response: {}", e)))?;
+                self.record_call(
+                    started.elapsed().as_millis() as u64,
+                    prompt.len(),
+                    data.response.len(),
+                );
                 return Ok(data.response);
             }
 
@@ -140,6 +178,7 @@ impl LlmClient {
         let api_key = self.api_key.as_ref()
             .ok_or_else(|| BrainError::Embedding("Anthropic API key not configured".to_string()))?;
 
+        let started = Instant::now();
         let resp = self.client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", api_key)
@@ -165,7 +204,9 @@ impl LlmClient {
         let data: AnthropicResponse = resp.json().await
             .map_err(|e| BrainError::Embedding(format!("Failed to parse Anthropic response: {}", e)))?;
 
-        Ok(data.content.first().map(|c| c.text.clone()).unwrap_or_default())
+        let text = data.content.first().map(|c| c.text.clone()).unwrap_or_default();
+        self.record_call(started.elapsed().as_millis() as u64, prompt.len(), text.len());
+        Ok(text)
     }
 
     /// Summarize content into a concise, information-dense summary.

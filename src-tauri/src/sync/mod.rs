@@ -196,10 +196,8 @@ async fn auto_import_chat(
         let project_name = path.parent()
             .and_then(|p| p.file_name())
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .replace("C--Users-User-OneDrive-Desktop-", "")
-            .replace("C--Users-User-", "")
-            .replace('-', " ");
+            .map(crate::decode_claude_project_name)
+            .unwrap_or_else(|| "unknown".to_string());
 
         // create_node now has built-in dedup via content_hash check, so
         // even if the sync_state check misses a case, the node won't be

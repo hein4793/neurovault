@@ -257,10 +257,8 @@ pub async fn import_chat_history(
 
         let project_name = project_path.file_name()
             .and_then(|n| n.to_str())
-            .unwrap_or("unknown")
-            .replace("C--Users-User-OneDrive-Desktop-", "")
-            .replace("C--Users-User-", "home-")
-            .replace('-', " ");
+            .map(crate::decode_claude_project_name)
+            .unwrap_or_else(|| "unknown".to_string());
 
         // Find all .jsonl chat files (skip subagents)
         let mut chat_files: Vec<std::path::PathBuf> = Vec::new();
