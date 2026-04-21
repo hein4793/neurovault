@@ -45,6 +45,54 @@ Get brain statistics (node count, edge count, IQ score, etc.).
 }
 ```
 
+### GET /metrics/power
+
+Per-circuit and per-backend energy rollup over the last `hours` window (default 24, clamped to `[1, 720]`). Every row in `inference_log` is aggregated; the response also carries an `annualized_kwh` projection that extrapolates the measured window to a full year.
+
+**Query:** `?hours=N` (optional, default `24`)
+
+**Response:**
+```json
+{
+  "window_hours": 24,
+  "total_calls": 9,
+  "total_energy_wh": 9.21,
+  "avg_watts": 257.2,
+  "annualized_kwh": 80.7,
+  "by_circuit": [
+    { "circuit": "self_synthesis", "calls": 3, "energy_wh": 2.1, "total_duration_ms": 25200, "avg_duration_ms": 8400.0 }
+  ],
+  "by_backend": [
+    { "backend": "ollama-vulkan", "calls": 7, "energy_wh": 8.66 },
+    { "backend": "ollama-cpu",    "calls": 2, "energy_wh": 0.56 }
+  ]
+}
+```
+
+### GET /metrics/power/status
+
+Live power-policy snapshot. Reports the active `PowerMode`, whether the adaptive policy currently wants to demote calls to CPU, whether a CPU Ollama daemon is configured, the detected AC-line state, and the wattage coefficients used by the energy estimator.
+
+**Response:**
+```json
+{
+  "mode": "normal",
+  "prefer_cpu": false,
+  "cpu_daemon_configured": true,
+  "on_battery": false,
+  "backend_watts": {
+    "ollama-vulkan": 300.0,
+    "ollama-cpu":    80.0,
+    "ollama-rocm":  280.0,
+    "anthropic-api":  0.0,
+    "peer-rpc":       0.0,
+    "ollama-gpu":   300.0
+  }
+}
+```
+
+`on_battery` may be `null` on platforms where AC detection is unavailable (non-Windows builds).
+
 ### POST /brain/recall
 
 Semantic search across all knowledge. Uses vector search (HNSW) when Ollama is available, falls back to FTS5 text search.

@@ -29,9 +29,10 @@ NeuroVault is a Tauri v2 desktop application with a Rust backend, React frontend
 | Backend | Rust (Tokio async runtime) | All business logic, circuits, API |
 | Database | SQLite + FTS5 (bundled) | Knowledge storage, full-text search |
 | Vector Search | HNSW (instant-distance, pure Rust) | Semantic similarity search |
-| LLM / Embeddings | Ollama (local) or Anthropic API | AI-powered analysis and embeddings |
+| LLM / Embeddings | Ollama (local, optional dual-daemon GPU+CPU) or Anthropic API | AI-powered analysis and embeddings |
 | MCP Bridge | Node.js stdio server | AI assistant integration |
 | HTTP API | Axum (localhost:17777) | External programmatic access |
+| Power Management | `power_telemetry.rs` + `power_policy.rs` | Per-inference energy logging, circuit-profile routing, AC/battery-driven Eco mode (see [POWER_PLAN.md](POWER_PLAN.md)) |
 
 ### Data Directory Layout
 

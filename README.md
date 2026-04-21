@@ -44,6 +44,12 @@ NeuroVault is a desktop knowledge management system that ingests your notes, cod
   - **Context Quality Tracking** -- Measures how useful injected context is and self-optimizes relevance rankings over time.
   - **Anticipatory Loading** -- Predicts what context you'll need next based on project, time of day, and pending research.
   - **Dream Mode** -- Overnight deep synthesis (5-pass reasoning) and morning briefings compiled before you wake up.
+- **Power Management** (NEW):
+  - **Per-inference energy telemetry** -- Every LLM call logs duration, tokens, backend, and estimated Wh to a local `inference_log` table; `GET /metrics/power` returns per-circuit rollups with annualized-kWh projection.
+  - **Dual-backend routing** -- Optional second Ollama daemon runs CPU-only inference (~80 W) for background circuits while interactive calls stay on the GPU (~300 W). Profile-based auto-routing picks the right backend per circuit; no manual wiring.
+  - **Adaptive policy** -- On-battery detection via `kernel32` flips the brain into Eco mode automatically and demotes every call to CPU; returns to Normal when plugged back in.
+  - **Model tiering** -- `llm_model_cpu` setting lets CPU routes use a smaller model (e.g. Qwen 3B) so batch circuits don't stall on a 14 B model at 1 tok/s.
+  - See [`docs/POWER_PLAN.md`](docs/POWER_PLAN.md) for the full phase-by-phase rollout.
 
 ## Quick Start
 
