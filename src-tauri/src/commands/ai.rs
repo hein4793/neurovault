@@ -30,6 +30,35 @@ pub(crate) fn get_llm_client_deep(db: &BrainDb) -> LlmClient {
     get_llm_client_for(db, LlmTier::Deep)
 }
 
+/// CPU-routed LLM client for batch circuits. Falls back to the GPU pool
+/// when `ollama_cpu_url` isn't configured, so circuits that ask for CPU
+/// still work on machines with a single-daemon setup — they just don't
+/// get the power savings. Phase 2.
+#[allow(dead_code)]
+pub(crate) fn get_llm_client_cpu(db: &BrainDb) -> LlmClient {
+    get_llm_client_cpu_tier(db, LlmTier::Default)
+}
+
+#[allow(dead_code)]
+pub(crate) fn get_llm_client_cpu_fast(db: &BrainDb) -> LlmClient {
+    get_llm_client_cpu_tier(db, LlmTier::Fast)
+}
+
+fn get_llm_client_cpu_tier(db: &BrainDb, tier: LlmTier) -> LlmClient {
+    let base = get_llm_client_for(db, tier);
+    match db.config.ollama_cpu_url.as_deref() {
+        Some(cpu_url) => LlmClient::new("ollama", base.model(), cpu_url, None)
+            .with_backend_tag("ollama-cpu"),
+        None => {
+            // No CPU daemon configured — stay on GPU. Telemetry will still
+            // record the call as `ollama-vulkan`; users see no savings
+            // until they start the second daemon and set ollama_cpu_url.
+            log::debug!("CPU LLM client requested but ollama_cpu_url not set — using GPU pool");
+            base
+        }
+    }
+}
+
 fn get_llm_client_for(db: &BrainDb, tier: LlmTier) -> LlmClient {
     let settings_path = db.config.data_dir.join("settings.json");
     let (provider, model, api_key) = if settings_path.exists() {

@@ -58,6 +58,11 @@ pub struct LlmClient {
     ollama_url: String,
     api_key: Option<String>,
     client: reqwest::Client,
+    /// Backend tag attached to power-telemetry rows for this client.
+    /// When None, falls back to provider-based inference in `backend_id()`.
+    /// Set by the factory when routing through the CPU-only daemon so
+    /// the inference_log correctly attributes energy to `ollama-cpu`.
+    backend_tag: Option<&'static str>,
 }
 
 /// System prompt that gives the model context about the brain.
@@ -74,19 +79,34 @@ impl LlmClient {
             ollama_url: ollama_url.to_string(),
             api_key,
             client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
+                .timeout(std::time::Duration::from_secs(300))
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
+            backend_tag: None,
         }
     }
 
-    /// Backend identifier used in the telemetry log. Derived from the
-    /// provider (and in the future, from the routing decision).
+    /// Tag this client's calls with a specific backend id for telemetry
+    /// (e.g. `"ollama-cpu"` when routing through the CPU-only daemon).
+    /// Returns Self to support fluent factory code.
+    pub fn with_backend_tag(mut self, tag: &'static str) -> Self {
+        self.backend_tag = Some(tag);
+        self
+    }
+
+    /// Model id this client will send generate requests against.
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// Backend identifier used in the telemetry log. Uses the explicit tag
+    /// if set (Phase 2 routing), else falls back to provider inference.
     fn backend_id(&self) -> &'static str {
+        if let Some(tag) = self.backend_tag {
+            return tag;
+        }
         match self.provider.as_str() {
             "anthropic" => "anthropic-api",
-            // TODO Phase 2: distinguish ollama-vulkan vs ollama-cpu via
-            // routed backend — for now assume the default GPU pool.
             _ => "ollama-vulkan",
         }
     }
