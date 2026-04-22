@@ -94,11 +94,6 @@ impl LlmClient {
         self
     }
 
-    /// Model id this client will send generate requests against.
-    pub fn model(&self) -> &str {
-        &self.model
-    }
-
     /// Backend identifier used in the telemetry log. Uses the explicit tag
     /// if set (Phase 2 routing), else falls back to provider inference.
     fn backend_id(&self) -> &'static str {

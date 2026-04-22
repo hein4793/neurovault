@@ -90,6 +90,10 @@ pub fn prefer_cpu() -> bool {
 }
 
 /// Should batch circuits queue (refuse to run) right now?
+/// Reserved for the `LoadShed` mode which will be auto-triggered once
+/// UPS/battery integration wires in. The caller is the batch scheduler
+/// (not yet wired), so this function stays unused until then.
+#[allow(dead_code)]
 pub fn should_queue_batch() -> bool {
     matches!(current_mode(), PowerMode::LoadShed)
 }

@@ -53,6 +53,7 @@ pub enum CircuitProfile {
 }
 
 impl CircuitProfile {
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Interactive => "interactive",
