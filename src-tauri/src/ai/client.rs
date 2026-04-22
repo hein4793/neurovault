@@ -122,9 +122,14 @@ impl LlmClient {
         // sake of keeping the recorder backend-agnostic.
         let tokens_in = (prompt_len / 4) as u32;
         let tokens_out = (response_len / 4) as u32;
+        // CRITICAL: read the circuit name from task-local BEFORE spawning —
+        // `tokio::spawn` starts a fresh task with no inherited task-locals,
+        // so calling `current_circuit()` inside the spawned future would
+        // always return "unknown". Capture it here and move into the spawn.
+        let circuit = power_telemetry::current_circuit();
         tokio::spawn(async move {
-            power_telemetry::record_inference_global(
-                &backend, &model, tokens_in, tokens_out, duration_ms,
+            power_telemetry::record_inference_with_circuit(
+                &circuit, &backend, &model, tokens_in, tokens_out, duration_ms,
             )
             .await;
         });

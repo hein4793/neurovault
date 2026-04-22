@@ -181,6 +181,7 @@ pub fn init_telemetry_db(db: Arc<BrainDb>) {
 
 /// Record an inference via the globally-registered DB. No-op when telemetry
 /// hasn't been initialized (tests, bootstrap).
+#[allow(dead_code)]
 pub async fn record_inference_global(
     backend: &str,
     model: &str,
@@ -190,6 +191,55 @@ pub async fn record_inference_global(
 ) {
     let Some(db) = TELEMETRY_DB.get().cloned() else { return };
     record_inference(&db, backend, model, tokens_in, tokens_out, duration_ms).await;
+}
+
+/// Same as `record_inference_global` but takes the circuit name explicitly
+/// instead of reading the task-local. Callers that dispatch the recorder
+/// via `tokio::spawn` must use this variant — task-locals do not propagate
+/// across spawn boundaries.
+pub async fn record_inference_with_circuit(
+    circuit: &str,
+    backend: &str,
+    model: &str,
+    tokens_in: u32,
+    tokens_out: u32,
+    duration_ms: u64,
+) {
+    let Some(db) = TELEMETRY_DB.get().cloned() else { return };
+    let energy_wh = estimate_energy_wh(backend, duration_ms);
+    let id = format!("inf:{}", uuid::Uuid::now_v7());
+    let created_at = chrono::Utc::now().to_rfc3339();
+    let circuit = circuit.to_string();
+    let backend = backend.to_string();
+    let model = model.to_string();
+
+    let result = db
+        .with_conn(move |conn| {
+            conn.execute(
+                "INSERT INTO inference_log
+                     (id, circuit, backend, model, tokens_in, tokens_out,
+                      duration_ms, energy_wh, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    id,
+                    circuit,
+                    backend,
+                    model,
+                    tokens_in as i64,
+                    tokens_out as i64,
+                    duration_ms as i64,
+                    energy_wh,
+                    created_at,
+                ],
+            )
+            .map_err(|e| BrainError::Database(e.to_string()))?;
+            Ok(())
+        })
+        .await;
+
+    if let Err(e) = result {
+        log::warn!("power_telemetry: failed to record inference: {}", e);
+    }
 }
 
 // =========================================================================

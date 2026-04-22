@@ -2172,10 +2172,37 @@ async fn circuit_code_pattern_extractor(db: &Arc<BrainDb>) -> Result<String, Bra
         content: String,
     }
 
+    // Match both explicitly-classified code_snippet nodes AND file-ingest
+    // nodes whose title carries a code-file extension. The file ingest
+    // path uses node_type='reference' by default, so restricting to
+    // 'code_snippet' alone misses the vast majority of code content.
+    // Extension list covers the languages the project most commonly works
+    // with; add more here if a codebase uses something exotic.
     let snippets: Vec<CodeNode> = db.with_conn(|conn| {
         let mut stmt = conn.prepare(
             "SELECT id, title, content FROM nodes \
              WHERE node_type = 'code_snippet' \
+                OR ( \
+                    source_type = 'file' \
+                    AND ( \
+                        title LIKE '%.rs'   OR title LIKE '%.rs (part%' \
+                     OR title LIKE '%.py'   OR title LIKE '%.py (part%' \
+                     OR title LIKE '%.ts'   OR title LIKE '%.ts (part%' \
+                     OR title LIKE '%.tsx'  OR title LIKE '%.tsx (part%' \
+                     OR title LIKE '%.js'   OR title LIKE '%.js (part%' \
+                     OR title LIKE '%.jsx'  OR title LIKE '%.jsx (part%' \
+                     OR title LIKE '%.go'   OR title LIKE '%.go (part%' \
+                     OR title LIKE '%.java' OR title LIKE '%.java (part%' \
+                     OR title LIKE '%.cpp'  OR title LIKE '%.cpp (part%' \
+                     OR title LIKE '%.c'    OR title LIKE '%.c (part%' \
+                     OR title LIKE '%.h'    OR title LIKE '%.h (part%' \
+                     OR title LIKE '%.rb'   OR title LIKE '%.rb (part%' \
+                     OR title LIKE '%.swift' OR title LIKE '%.swift (part%' \
+                     OR title LIKE '%.kt'   OR title LIKE '%.kt (part%' \
+                     OR title LIKE '%.php'  OR title LIKE '%.php (part%' \
+                     OR title LIKE '%.cs'   OR title LIKE '%.cs (part%' \
+                    ) \
+                ) \
              ORDER BY created_at DESC LIMIT 25"
         ).map_err(|e| BrainError::Database(e.to_string()))?;
         let rows = stmt.query_map([], |row| {
